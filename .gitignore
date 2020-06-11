@@ -1,1 +1,6 @@
+/backup/
+/obj/
 /voc/
+/results/
+/darknet
+/libdarknet.*

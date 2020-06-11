@@ -340,6 +340,7 @@ layer parse_yolo(list *options, size_params params)
     l.lb_dis_truth_thresh = option_find_float_quiet(options, "lb_dis_truth_thresh", 0);
     l.scale_xy = option_find_float_quiet(options, "scale_xy", 1);
     l.use_center_regression = option_find_int(options, "use_center_regression", 0);
+    l.object_focal_loss = option_find_int(options, "object_focal_loss", 0);
 
     char *map_file = option_find_str(options, "map", 0);
     if (map_file) l.map = read_map(map_file);

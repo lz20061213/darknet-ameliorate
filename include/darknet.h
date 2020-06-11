@@ -194,6 +194,7 @@ struct layer{
     int *mask;
     int total;
 
+    // add for yolo layer
     float scale_xy;
 
     int use_center_regression;
@@ -203,6 +204,9 @@ struct layer{
     int distill_index;
     int hint_index;
     int mutual_index;
+
+    int object_focal_loss;
+    // add for yolo layer
 
     float alpha;
     float beta;

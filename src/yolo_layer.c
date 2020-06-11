@@ -202,9 +202,20 @@ void forward_yolo_layer(const layer l, network net)
                     float lb_dis = box_lb_dis(pred, truth);
                     // here we modify objectness to loc confidence
                     l.delta[obj_index] = 0 - l.output[obj_index];
+
                     if (l.rescore) {
                         l.delta[obj_index] = two_way_max(0, 1 - lb_dis / l.lb_dis_max_thresh) - l.output[obj_index];
                     }
+
+                    if (l.object_focal_loss) {
+                        float alpha = 0.5;
+                        // gamma = 2;
+                        float pt = l.output[obj_index] + 0.000000000000001F;
+                        float grad = -(1 - pt) * (2 * pt * logf(pt) + pt - 1);
+                        l.delta[obj_index] *= alpha * grad;
+
+                    }
+
                     if (best_iou > l.ignore_thresh) {
                         if (l.rescore) {
                             if (lb_dis < l.lb_dis_ignore_thresh) {
@@ -222,6 +233,16 @@ void forward_yolo_layer(const layer l, network net)
                         } else {
                             l.delta[obj_index] = 1 - l.output[obj_index];
                         }
+
+                        if (l.object_focal_loss) {
+                            float alpha = 0.5;
+                            // gamma = 2;
+                            float pt = l.output[obj_index] + 0.000000000000001F;
+                            float grad = -(1 - pt) * (2 * pt * logf(pt) + pt - 1);
+                            l.delta[obj_index] *= alpha * grad;
+
+                        }
+
                         int class = net.truth[best_t*(4 + 1) + b*l.truths + 4];
                         if (l.map) class = l.map[class];
                         int class_index = entry_index(l, b, n*l.w*l.h + j*l.w + i, 4 + 1);
@@ -269,6 +290,14 @@ void forward_yolo_layer(const layer l, network net)
 
                 if (l.rescore) {
                     l.delta[obj_index] = two_way_max(0, 1 - lb_dis / l.lb_dis_max_thresh) - l.output[obj_index];
+                }
+
+                if (l.object_focal_loss) {
+                    float alpha = 0.5;
+                    // gamma = 2;
+                    float pt = l.output[obj_index] + 0.000000000000001F;
+                    float grad = -(1 - pt) * (2 * pt * logf(pt) + pt - 1);
+                    l.delta[obj_index] *= alpha * grad;
                 }
 
                 int class = net.truth[t*(4 + 1) + b*l.truths + 4];
