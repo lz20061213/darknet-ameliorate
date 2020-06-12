@@ -783,6 +783,7 @@ void demo(char *cfgfile, char *weightfile, float thresh, int cam_index, const ch
 void get_detection_detections(layer l, int w, int h, float thresh, detection *dets);
 
 char *option_find_str(list *l, char *key, char *def);
+char *option_find_str_quiet(list *l, char *key, char *def);
 int option_find_int(list *l, char *key, int def);
 int option_find_int_quiet(list *l, char *key, int def);
 
@@ -836,6 +837,15 @@ void rotate_image_cw(image im, int times);
 double what_time_is_it_now();
 image rotate_image(image m, float rad);
 void visualize_network(network *net);
+
+float box_iou(box a, box b);
+float box_giou(box a, box b);
+float box_diou(box a, box b);
+float box_ciou(box a, box b);
+float box_lb_dis(box a, box b);
+boxabs to_tblr(box a);
+dxrep dx_box_iou(box a, box b, IOU_LOSS iou_loss);
+
 data load_all_cifar10();
 box_label *read_boxes(char *filename, int *n);
 box float_to_box(float *f, int stride);

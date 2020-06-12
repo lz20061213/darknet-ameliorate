@@ -401,30 +401,36 @@ void forward_yolo_layer(const layer l, network net)
     }
     float classification_loss = l.cls_normalizer * pow(mag_array(no_iou_loss_delta, l.outputs * l.batch), 2);
     free(no_iou_loss_delta);
-    float loss = pow(mag_array(l.delta, l.outputs * l.batch), 2);
-    float iou_loss = loss - classification_loss;
 
     float avg_iou_loss = 0;
     // gIOU loss + MSE (objectness) loss
     if (l.iou_loss == MSE) {
         *(l.cost) = pow(mag_array(l.delta, l.outputs * l.batch), 2);
+        avg_iou_loss = count > 0 ? (*(l.cost) - classification_loss) / count : 0
     } else {
-        if (l.iou_loss == GIOU) {
+        if (l.iou_loss == IOU) {
+            avg_iou_loss = count > 0 ? l.iou_normalizer * (tot_iou_loss / count) : 0;
+        }
+        else if (l.iou_loss == GIOU) {
             avg_iou_loss = count > 0 ? l.iou_normalizer * (tot_giou_loss / count) : 0;
         }
-        else {
-            if (l.iou_loss == DIOU) {
-                avg_iou_loss = count > 0 ? l.iou_normalizer * (tot_diou_loss / count) : 0;
-            } else {
-                avg_iou_loss = count > 0 ? l.iou_normalizer * (tot_ciou_loss / count) : 0;
-            }
+        else if (l.iou_loss == DIOU) {
+            avg_iou_loss = count > 0 ? l.iou_normalizer * (tot_diou_loss / count) : 0;
+        }
+        else if (l.iou_loss == CIOU) {
+            avg_iou_loss = count > 0 ? l.iou_normalizer * (tot_ciou_loss / count) : 0;
         }
         *(l.cost) = avg_iou_loss + classification_loss;
     }
 
-    fprintf(stderr, "(%s loss, Normalizer: (iou: %.2f, cls: %.2f) Region %d Avg (IOU: %f, GIOU: %f), Class: %f, Obj: %f, No Obj: %f, .5R: %f, .75R: %f, count: %d, class_loss = %f, iou_loss = %f, total_loss = %f \n",
-        (l.iou_loss == MSE ? "mse" : (l.iou_loss == GIOU ? "giou" : (l.iou_loss == DIOU ? "diou" : "ciou"))), l.iou_normalizer, l.cls_normalizer, net.index, tot_iou / count, tot_giou / count, avg_cat / class_count, avg_obj / count, avg_anyobj / (l.w*l.h*l.n*l.batch), recall / count, recall75 / count, count,
-        classification_loss, iou_loss, loss);
+    fprintf(stderr, "(%s loss, Normalizer: (iou: %.2f, cls: %.2f) Region %d Avg (IOU: %f, %s: %f), Class: %f, Obj: %f, No Obj: %f, .5R: %f, .75R: %f, count: %d, class_loss = %f, avg_iou_loss = %f, total_loss = %f \n",
+        (l.iou_loss == MSE ? "mse" : (l.iou_loss == GIOU ? "giou" : (l.iou_loss == DIOU ? "diou" : "ciou"))),
+        l.iou_normalizer, l.cls_normalizer, net.index,
+        tot_iou / count,
+        (l.iou_loss == MSE ? "iou" : (l.iou_loss == GIOU ? "giou" : (l.iou_loss == DIOU ? "diou" : "ciou"))),
+        (l.iou_loss == MSE ?  tot_iou / count : (l.iou_loss == GIOU ? tot_giou / count : (l.iou_loss == DIOU ? tot_diou / count : tot_ciou / count))),
+        avg_cat / class_count, avg_obj / count, avg_anyobj / (l.w*l.h*l.n*l.batch), recall / count, recall75 / count, count,
+        classification_loss, avg_iou_loss, *(l.cost));
 
 }
 
