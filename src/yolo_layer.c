@@ -97,29 +97,68 @@ box get_yolo_box(float *x, float *biases, int n, int index, int use_center_regre
     return b;
 }
 
-float delta_yolo_box(box truth, float *x, float *biases, int n, int index, int use_center_regression, int i, int j, int lw, int lh, int w, int h, float *delta, float scale, int stride)
+ious delta_yolo_box(box truth, float *x, float *biases, int n, int index, int use_center_regression, int i, int j, int lw, int lh, int w, int h, float *delta, float scale, int stride,
+    float iou_normalizer, IOU_LOSS iou_loss)
 {
+    ious all_ious = {0};
+
     box pred = get_yolo_box(x, biases, n, index, use_center_regression, i, j, lw, lh, w, h, stride);
-    float iou = box_iou(pred, truth);
 
-    float tx = 0;
-    float ty = 0;
-    if (use_center_regression) {
-        tx = (truth.x*lw - i - 0.5);
-        ty = (truth.y*lh - j - 0.5);
-        //printf("tx ty: %f %f\n", tx, ty);
+    all_ious.iou = box_iou(pred, truth);
+    all_ious.giou = box_giou(pred, truth);
+    all_ious.diou = box_diou(pred, truth);
+    all_ious.ciou = box_ciou(pred, truth);
+
+    // avoid nan in dx_box_iou
+    if (pred.w == 0) { pred.w = 1.0; }
+    if (pred.h == 0) { pred.h = 1.0; }
+
+    if (iou_loss == MSE) {
+        float tx = 0;
+        float ty = 0;
+        if (use_center_regression) {
+            tx = (truth.x*lw - i - 0.5);
+            ty = (truth.y*lh - j - 0.5);
+            //printf("tx ty: %f %f\n", tx, ty);
+        } else {
+            tx = (truth.x*lw - i);
+            ty = (truth.y*lh - j);
+        }
+        float tw = log(truth.w*w / biases[2*n]);
+        float th = log(truth.h*h / biases[2*n + 1]);
+
+        delta[index + 0*stride] = scale * (tx - x[index + 0*stride]) * iou_normalizer;
+        delta[index + 1*stride] = scale * (ty - x[index + 1*stride]) * iou_normalizer;
+        delta[index + 2*stride] = scale * (tw - x[index + 2*stride]) * iou_normalizer;
+        delta[index + 3*stride] = scale * (th - x[index + 3*stride]) * iou_normalizer;
     } else {
-        tx = (truth.x*lw - i);
-        ty = (truth.y*lh - j);
-    }
-    float tw = log(truth.w*w / biases[2*n]);
-    float th = log(truth.h*h / biases[2*n + 1]);
+        // https://github.com/generalized-iou/g-darknet
+        // https://arxiv.org/abs/1902.09630v2
+        // https://giou.stanford.edu/
+        all_ious.dx_iou = dx_box_iou(pred, truth, iou_loss);
+        // jacobian^t (transpose)
+        float dx = all_ious.dx_iou.dt;
+        float dy = all_ious.dx_iou.db;
+        float dw = all_ious.dx_iou.dl;
+        float dh = all_ious.dx_iou.dr;
+         // predict exponential, apply gradient of e^delta_t ONLY for w,h
+        dw *= exp(x[index + 2 * stride]);
+        dh *= exp(x[index + 3 * stride]);
 
-    delta[index + 0*stride] = scale * (tx - x[index + 0*stride]);
-    delta[index + 1*stride] = scale * (ty - x[index + 1*stride]);
-    delta[index + 2*stride] = scale * (tw - x[index + 2*stride]);
-    delta[index + 3*stride] = scale * (th - x[index + 3*stride]);
-    return iou;
+        // normalize iou weight
+        dx *= iou_normalizer;
+        dy *= iou_normalizer;
+        dw *= iou_normalizer;
+        dh *= iou_normalizer;
+
+        // delta
+        delta[index + 0 * stride] = dx;
+        delta[index + 1 * stride] = dy;
+        delta[index + 2 * stride] = dw;
+        delta[index + 3 * stride] = dh;
+    }
+
+    return all_ious;
 }
 
 
@@ -169,7 +208,14 @@ void forward_yolo_layer(const layer l, network net)
 
     memset(l.delta, 0, l.outputs * l.batch * sizeof(float));
     if(!net.train) return;
-    float avg_iou = 0;
+    float tot_iou = 0;
+    float tot_giou = 0;
+    float tot_diou = 0;
+    float tot_ciou = 0;
+    float tot_iou_loss = 0;
+    float tot_giou_loss = 0;
+    float tot_diou_loss = 0;
+    float tot_ciou_loss = 0;
     float recall = 0;
     float recall75 = 0;
     float avg_cat = 0;
@@ -248,7 +294,7 @@ void forward_yolo_layer(const layer l, network net)
                         int class_index = entry_index(l, b, n*l.w*l.h + j*l.w + i, 4 + 1);
                         delta_yolo_class(l.output, l.delta, class_index, class, l.classes, l.w*l.h, 0);
                         box truth = float_to_box(net.truth + best_t*(4 + 1) + b*l.truths, 1);
-                        delta_yolo_box(truth, l.output, l.biases, l.mask[n], box_index, l.use_center_regression, i, j, l.w, l.h, net.w, net.h, l.delta, (2-truth.w*truth.h), l.w*l.h);
+                        delta_yolo_box(truth, l.output, l.biases, l.mask[n], box_index, l.use_center_regression, i, j, l.w, l.h, net.w, net.h, l.delta, (2-truth.w*truth.h), l.w*l.h, l.iou_normalizer, l.iou_loss);
                     }
                 }
             }
@@ -278,7 +324,20 @@ void forward_yolo_layer(const layer l, network net)
             int mask_n = int_index(l.mask, best_n, l.n);
             if(mask_n >= 0){
                 int box_index = entry_index(l, b, mask_n*l.w*l.h + j*l.w + i, 0);
-                float iou = delta_yolo_box(truth, l.output, l.biases, best_n, box_index, l.use_center_regression, i, j, l.w, l.h, net.w, net.h, l.delta, (2-truth.w*truth.h), l.w*l.h);
+                ious all_ious = delta_yolo_box(truth, l.output, l.biases, best_n, box_index, l.use_center_regression, i, j, l.w, l.h, net.w, net.h, l.delta, (2-truth.w*truth.h), l.w*l.h, l.iou_normalizer, l.iou_loss);
+
+                // range is 0 <= 1
+                tot_iou += all_ious.iou;
+                tot_iou_loss += 1 - all_ious.iou;
+                // range is -1 <= giou <= 1
+                tot_giou += all_ious.giou;
+                tot_giou_loss += 1 - all_ious.giou;
+
+                tot_diou += all_ious.diou;
+                tot_diou_loss += 1 - all_ious.diou;
+
+                tot_ciou += all_ious.ciou;
+                tot_ciou_loss += 1 - all_ious.ciou;
 
                 int obj_index = entry_index(l, b, mask_n*l.w*l.h + j*l.w + i, 4);
                 avg_obj += l.output[obj_index];
@@ -307,15 +366,62 @@ void forward_yolo_layer(const layer l, network net)
 
                 ++count;
                 ++class_count;
-                if(iou > .5) recall += 1;
-                if(iou > .75) recall75 += 1;
-                avg_iou += iou;
+                if(all_ious.iou > .5) recall += 1;
+                if(all_ious.iou > .75) recall75 += 1;
+                //avg_iou += all_ious.iou;
             }
         }
     }
-    *(l.cost) = pow(mag_array(l.delta, l.outputs * l.batch), 2);
 
-    printf("Region %d Avg IOU: %f, Class: %f, Obj: %f, No Obj: %f, .5R: %f, .75R: %f,  count: %d\n", net.index, avg_iou/count, avg_cat/class_count, avg_obj/count, avg_anyobj/(l.w*l.h*l.n*l.batch), recall/count, recall75/count, count);
+    if (count == 0) count = 1;
+    if (class_count == 0) class_count = 1;
+
+    // original mse loss (not true, just for show)
+    //*(l.cost) = pow(mag_array(l.delta, l.outputs * l.batch), 2);
+    //printf("Region %d Avg IOU: %f, Class: %f, Obj: %f, No Obj: %f, .5R: %f, .75R: %f,  count: %d\n", net.index, avg_iou/count, avg_cat/class_count, avg_obj/count, avg_anyobj/(l.w*l.h*l.n*l.batch), recall/count, recall75/count, count);
+
+    // Always compute classification loss both for iou + cls loss and for logging with mse loss
+    // TODO: remove IOU loss fields before computing MSE on class
+    //   probably split into two arrays
+    int stride = l.w*l.h;
+    float* no_iou_loss_delta = (float *)calloc(l.batch * l.outputs, sizeof(float));
+    memcpy(no_iou_loss_delta, l.delta, l.batch * l.outputs * sizeof(float));
+    for (b = 0; b < l.batch; ++b) {
+        for (j = 0; j < l.h; ++j) {
+            for (i = 0; i < l.w; ++i) {
+                for (n = 0; n < l.n; ++n) {
+                    int index = entry_index(l, b, n*l.w*l.h + j*l.w + i, 0);
+                    no_iou_loss_delta[index + 0 * stride] = 0;
+                    no_iou_loss_delta[index + 1 * stride] = 0;
+                    no_iou_loss_delta[index + 2 * stride] = 0;
+                    no_iou_loss_delta[index + 3 * stride] = 0;
+                }
+            }
+        }
+    }
+    float classification_loss = l.cls_normalizer * pow(mag_array(no_iou_loss_delta, l.outputs * l.batch), 2);
+    free(no_iou_loss_delta);
+    float loss = pow(mag_array(l.delta, l.outputs * l.batch), 2);
+    float iou_loss = loss - classification_loss;
+
+    float avg_iou_loss = 0;
+    // gIOU loss + MSE (objectness) loss
+    if (l.iou_loss == MSE) {
+        *(l.cost) = pow(mag_array(l.delta, l.outputs * l.batch), 2);
+    } else {
+        if (l.iou_loss == GIOU) {
+            avg_iou_loss = count > 0 ? l.iou_normalizer * (tot_giou_loss / count) : 0;
+        }
+        else {
+            avg_iou_loss = count > 0 ? l.iou_normalizer * (tot_iou_loss / count) : 0;
+        }
+        *(l.cost) = avg_iou_loss + classification_loss;
+    }
+
+    fprintf(stderr, "(%s loss, Normalizer: (iou: %.2f, cls: %.2f) Region %d Avg (IOU: %f, GIOU: %f), Class: %f, Obj: %f, No Obj: %f, .5R: %f, .75R: %f, count: %d, class_loss = %f, iou_loss = %f, total_loss = %f \n",
+        (l.iou_loss == MSE ? "mse" : (l.iou_loss == GIOU ? "giou" : "iou")), l.iou_normalizer, l.cls_normalizer, net.index, tot_iou / count, tot_giou / count, avg_cat / class_count, avg_obj / count, avg_anyobj / (l.w*l.h*l.n*l.batch), recall / count, recall75 / count, count,
+        classification_loss, iou_loss, loss);
+
 }
 
 void backward_yolo_layer(const layer l, network net)

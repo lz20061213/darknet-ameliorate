@@ -49,6 +49,15 @@ typedef enum{
     LOGISTIC, RELU, RELIE, LINEAR, RAMP, TANH, HALFTANH, PLSE, LEAKY, ELU, LOGGY, STAIR, HARDTAN, LHTAN, SELU, SWISH
 } ACTIVATION;
 
+typedef enum {
+    MSE, IOU, GIOU, DIOU, CIOU
+} IOU_LOSS;
+
+// parser.h
+typedef enum {
+    DEFAULT_NMS, GREEDY_NMS, DIOU_NMS, CORNERS_NMS
+} NMS_KIND;
+
 typedef enum{
     PNG, BMP, TGA, JPG
 } IMTYPE;
@@ -206,6 +215,12 @@ struct layer{
     int mutual_index;
 
     int object_focal_loss;
+    float iou_normalizer;
+    float cls_normalizer;
+    IOU_LOSS iou_loss;
+    IOU_LOSS iou_thresh_kind;
+    NMS_KIND nms_kind;
+    float beta_nms;
     // add for yolo layer
 
     float alpha;
@@ -572,9 +587,24 @@ typedef struct {
     float *data;
 } image;
 
-typedef struct{
+typedef struct box {
     float x, y, w, h;
 } box;
+
+typedef struct boxabs {
+    float left, right, top, bot;
+} boxabs;
+
+// box.h
+typedef struct dxrep {
+    float dt, db, dl, dr;
+} dxrep;
+
+typedef struct ious {
+    float iou, giou, diou, ciou;
+    dxrep dx_iou;
+    dxrep dx_giou;
+} ious;
 
 typedef struct detection{
     box bbox;
@@ -589,7 +619,6 @@ typedef struct matrix{
     int rows, cols;
     float **vals;
 } matrix;
-
 
 typedef struct{
     int w, h;

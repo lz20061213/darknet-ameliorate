@@ -21,6 +21,7 @@
 #include "distill_yolo_layer.h"
 #include "mutual_yolo_layer.h"
 #include "mimicutual_yolo_layer.h"
+#include "double_yolo_layer.h"
 #include "normalization_layer.h"
 #include "batchnorm_layer.h"
 #include "maxpool_layer.h"
