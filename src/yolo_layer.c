@@ -413,13 +413,17 @@ void forward_yolo_layer(const layer l, network net)
             avg_iou_loss = count > 0 ? l.iou_normalizer * (tot_giou_loss / count) : 0;
         }
         else {
-            avg_iou_loss = count > 0 ? l.iou_normalizer * (tot_iou_loss / count) : 0;
+            if (l.iou_loss == DIOU) {
+                avg_iou_loss = count > 0 ? l.iou_normalizer * (tot_diou_loss / count) : 0;
+            } else {
+                avg_iou_loss = count > 0 ? l.iou_normalizer * (tot_ciou_loss / count) : 0;
+            }
         }
         *(l.cost) = avg_iou_loss + classification_loss;
     }
 
     fprintf(stderr, "(%s loss, Normalizer: (iou: %.2f, cls: %.2f) Region %d Avg (IOU: %f, GIOU: %f), Class: %f, Obj: %f, No Obj: %f, .5R: %f, .75R: %f, count: %d, class_loss = %f, iou_loss = %f, total_loss = %f \n",
-        (l.iou_loss == MSE ? "mse" : (l.iou_loss == GIOU ? "giou" : "iou")), l.iou_normalizer, l.cls_normalizer, net.index, tot_iou / count, tot_giou / count, avg_cat / class_count, avg_obj / count, avg_anyobj / (l.w*l.h*l.n*l.batch), recall / count, recall75 / count, count,
+        (l.iou_loss == MSE ? "mse" : (l.iou_loss == GIOU ? "giou" : (l.iou_loss == DIOU ? "diou" : "ciou"))), l.iou_normalizer, l.cls_normalizer, net.index, tot_iou / count, tot_giou / count, avg_cat / class_count, avg_obj / count, avg_anyobj / (l.w*l.h*l.n*l.batch), recall / count, recall75 / count, count,
         classification_loss, iou_loss, loss);
 
 }

@@ -836,8 +836,6 @@ void rotate_image_cw(image im, int times);
 double what_time_is_it_now();
 image rotate_image(image m, float rad);
 void visualize_network(network *net);
-float box_iou(box a, box b);
-float box_lb_dis(box a, box b);
 data load_all_cifar10();
 box_label *read_boxes(char *filename, int *n);
 box float_to_box(float *f, int stride);
