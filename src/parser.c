@@ -372,6 +372,7 @@ layer parse_yolo(list *options, size_params params)
         printf("nms_kind: %s (%d), beta = %f \n", nms_kind, l.nms_kind, l.beta_nms);
     }
 
+    l.atss =  option_find_int_quiet(options, "atss", 0);
 
     char *map_file = option_find_str(options, "map", 0);
     if (map_file) l.map = read_map(map_file);

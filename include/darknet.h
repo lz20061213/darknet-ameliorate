@@ -221,6 +221,8 @@ struct layer{
     IOU_LOSS iou_thresh_kind;
     NMS_KIND nms_kind;
     float beta_nms;
+
+    int atss;
     // add for yolo layer
 
     float alpha;

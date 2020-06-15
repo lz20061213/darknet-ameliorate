@@ -310,65 +310,91 @@ void forward_yolo_layer(const layer l, network net)
             j = (truth.y * l.h);
             box truth_shift = truth;
             truth_shift.x = truth_shift.y = 0;
+
+            // get mean and std of all iou(anchor, truth)
+            float *per_ious = calloc(l.total, sizeof(float));
+            float mean_iou = 0;
+            float std_iou = 0;
+            float target_iou = 0;
             for(n = 0; n < l.total; ++n){
                 box pred = {0};
                 pred.w = l.biases[2*n]/net.w;
                 pred.h = l.biases[2*n+1]/net.h;
                 float iou = box_iou(pred, truth_shift);
+                mean_iou += iou;
+                per_ious[n] = iou;
                 if (iou > best_iou){
                     best_iou = iou;
                     best_n = n;
                 }
+                if (n==l.total - 1) mean_iou /= l.total;
             }
 
-            int mask_n = int_index(l.mask, best_n, l.n);
-            if(mask_n >= 0){
-                int box_index = entry_index(l, b, mask_n*l.w*l.h + j*l.w + i, 0);
-                ious all_ious = delta_yolo_box(truth, l.output, l.biases, best_n, box_index, l.use_center_regression, i, j, l.w, l.h, net.w, net.h, l.delta, (2-truth.w*truth.h), l.w*l.h, l.iou_normalizer, l.iou_loss);
+            for(n = 0; n < l.total; ++n) {
+                std_iou += pow(per_ious[n] - mean_iou, 2);
+            }
+            std_iou = sqrt(std_iou/l.total);
 
-                // range is 0 <= 1
-                tot_iou += all_ious.iou;
-                tot_iou_loss += 1 - all_ious.iou;
-                // range is -1 <= giou <= 1
-                tot_giou += all_ious.giou;
-                tot_giou_loss += 1 - all_ious.giou;
+            target_iou = mean_iou + std_iou;
 
-                tot_diou += all_ious.diou;
-                tot_diou_loss += 1 - all_ious.diou;
+            //printf("mean: %.4f, std: %.4f, tagert: %.4f\n", mean_iou, std_iou, target_iou);
 
-                tot_ciou += all_ious.ciou;
-                tot_ciou_loss += 1 - all_ious.ciou;
+            for(n = 0; n < l.total; ++n) {
+                int is_positive = 0;
+                if(l.atss && per_ious[n] >= target_iou) is_positive = 1;
+                if (n == best_n) is_positive = 1;
 
-                int obj_index = entry_index(l, b, mask_n*l.w*l.h + j*l.w + i, 4);
-                avg_obj += l.output[obj_index];
+                int mask_n = int_index(l.mask, n, l.n);
 
-                box pred = get_yolo_box(l.output, l.biases, best_n, box_index, l.use_center_regression, i, j, l.w, l.h, net.w, net.h, l.w*l.h);
-                float lb_dis = box_lb_dis(pred, truth);
+                if (mask_n>=0 && is_positive) {
 
-                l.delta[obj_index] = 1 - l.output[obj_index];
+                    int box_index = entry_index(l, b, mask_n*l.w*l.h + j*l.w + i, 0);
+                    ious all_ious = delta_yolo_box(truth, l.output, l.biases, n, box_index, l.use_center_regression, i, j, l.w, l.h, net.w, net.h, l.delta, (2-truth.w*truth.h), l.w*l.h, l.iou_normalizer, l.iou_loss);
 
-                if (l.rescore) {
-                    l.delta[obj_index] = two_way_max(0, 1 - lb_dis / l.lb_dis_max_thresh) - l.output[obj_index];
+                    // range is 0 <= 1
+                    tot_iou += all_ious.iou;
+                    tot_iou_loss += 1 - all_ious.iou;
+                    // range is -1 <= giou <= 1
+                    tot_giou += all_ious.giou;
+                    tot_giou_loss += 1 - all_ious.giou;
+
+                    tot_diou += all_ious.diou;
+                    tot_diou_loss += 1 - all_ious.diou;
+
+                    tot_ciou += all_ious.ciou;
+                    tot_ciou_loss += 1 - all_ious.ciou;
+
+                    int obj_index = entry_index(l, b, mask_n*l.w*l.h + j*l.w + i, 4);
+                    avg_obj += l.output[obj_index];
+
+                    box pred = get_yolo_box(l.output, l.biases, n, box_index, l.use_center_regression, i, j, l.w, l.h, net.w, net.h, l.w*l.h);
+                    float lb_dis = box_lb_dis(pred, truth);
+
+                    l.delta[obj_index] = 1 - l.output[obj_index];
+
+                    if (l.rescore) {
+                        l.delta[obj_index] = two_way_max(0, 1 - lb_dis / l.lb_dis_max_thresh) - l.output[obj_index];
+                    }
+
+                    if (l.object_focal_loss) {
+                        float alpha = 0.5;
+                        // gamma = 2;
+                        float pt = l.output[obj_index] + 0.000000000000001F;
+                        float grad = -(1 - pt) * (2 * pt * logf(pt) + pt - 1);
+                        l.delta[obj_index] *= alpha * grad;
+                    }
+
+                    int class = net.truth[t*(4 + 1) + b*l.truths + 4];
+                    if (l.map) class = l.map[class];
+                    int class_index = entry_index(l, b, mask_n*l.w*l.h + j*l.w + i, 4 + 1);
+                    delta_yolo_class(l.output, l.delta, class_index, class, l.classes, l.w*l.h, &avg_cat);
+
+                    ++count;
+                    ++class_count;
+                    if(all_ious.iou > .5) recall += 1;
+                    if(all_ious.iou > .75) recall75 += 1;
+                    //avg_iou += all_ious.iou;
                 }
-
-                if (l.object_focal_loss) {
-                    float alpha = 0.5;
-                    // gamma = 2;
-                    float pt = l.output[obj_index] + 0.000000000000001F;
-                    float grad = -(1 - pt) * (2 * pt * logf(pt) + pt - 1);
-                    l.delta[obj_index] *= alpha * grad;
-                }
-
-                int class = net.truth[t*(4 + 1) + b*l.truths + 4];
-                if (l.map) class = l.map[class];
-                int class_index = entry_index(l, b, mask_n*l.w*l.h + j*l.w + i, 4 + 1);
-                delta_yolo_class(l.output, l.delta, class_index, class, l.classes, l.w*l.h, &avg_cat);
-
-                ++count;
-                ++class_count;
-                if(all_ious.iou > .5) recall += 1;
-                if(all_ious.iou > .75) recall75 += 1;
-                //avg_iou += all_ious.iou;
             }
         }
     }
@@ -406,7 +432,7 @@ void forward_yolo_layer(const layer l, network net)
     // gIOU loss + MSE (objectness) loss
     if (l.iou_loss == MSE) {
         *(l.cost) = pow(mag_array(l.delta, l.outputs * l.batch), 2);
-        avg_iou_loss = count > 0 ? (*(l.cost) - classification_loss) / count : 0
+        avg_iou_loss = count > 0 ? (*(l.cost) - classification_loss) / count : 0;
     } else {
         if (l.iou_loss == IOU) {
             avg_iou_loss = count > 0 ? l.iou_normalizer * (tot_iou_loss / count) : 0;
@@ -423,12 +449,13 @@ void forward_yolo_layer(const layer l, network net)
         *(l.cost) = avg_iou_loss + classification_loss;
     }
 
-    fprintf(stderr, "(%s loss, Normalizer: (iou: %.2f, cls: %.2f) Region %d Avg (IOU: %f, %s: %f), Class: %f, Obj: %f, No Obj: %f, .5R: %f, .75R: %f, count: %d, class_loss = %f, avg_iou_loss = %f, total_loss = %f \n",
-        (l.iou_loss == MSE ? "mse" : (l.iou_loss == GIOU ? "giou" : (l.iou_loss == DIOU ? "diou" : "ciou"))),
+
+    fprintf(stderr, "(%s loss, normalizer: (iou: %.2f, cls: %.2f) Region %d Avg (iou: %f, %s: %f), Class: %f, Obj: %f, No Obj: %f, .5R: %f, .75R: %f, count: %d, class_loss = %f, avg_iou_loss = %f, total_loss = %f \n",
+        ((l.iou_loss == MSE) ? "mse" : (l.iou_loss == IOU ? "iou" : (l.iou_loss == GIOU ? "giou" : (l.iou_loss == DIOU ? "diou" : "ciou")))),
         l.iou_normalizer, l.cls_normalizer, net.index,
         tot_iou / count,
-        (l.iou_loss == MSE ? "iou" : (l.iou_loss == GIOU ? "giou" : (l.iou_loss == DIOU ? "diou" : "ciou"))),
-        (l.iou_loss == MSE ?  tot_iou / count : (l.iou_loss == GIOU ? tot_giou / count : (l.iou_loss == DIOU ? tot_diou / count : tot_ciou / count))),
+        ((l.iou_loss == MSE) ? "mse" : (l.iou_loss == IOU ? "iou" : (l.iou_loss == GIOU ? "giou" : (l.iou_loss == DIOU ? "diou" : "ciou")))),
+        (l.iou_loss == MSE ?  tot_iou / count : (l.iou_loss == IOU ? tot_iou / count : (l.iou_loss == GIOU ? tot_giou / count : (l.iou_loss == DIOU ? tot_diou / count : tot_ciou / count)))),
         avg_cat / class_count, avg_obj / count, avg_anyobj / (l.w*l.h*l.n*l.batch), recall / count, recall75 / count, count,
         classification_loss, avg_iou_loss, *(l.cost));
 
