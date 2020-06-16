@@ -119,7 +119,13 @@ dbox derivative(box a, box b)
     dbox d;
     d.dx = 0;
     d.dw = 0;
-    float l1 = a.x - a.w/2;
+    d.dy = 0;
+    d.dh = 0;
+    d.dx= a.x < b.x ? 1.0 : -1.0;
+    d.dy= a.y < b.y ? 1.0 : -1.0;
+    d.dw= a.w < b.w ? 1.0 : -1.0;
+    d.dh= a.h < b.h ? 1.0 : -1.0;
+    /*float l1 = a.x - a.w/2;
     float l2 = b.x - b.w/2;
     if (l1 > l2){
         d.dx -= 1;
@@ -161,7 +167,7 @@ dbox derivative(box a, box b)
     if (b1 < t2){
         d.dy = 1;
         d.dh = 0;
-    }
+    }*/
     return d;
 }
 
@@ -206,7 +212,9 @@ boxabs to_tblr(box a) {
     return tblr;
 }
 
-// get the minimum enclosing rectangle of a and b
+/**
+ * where c is the smallest box that fully encompases a and b
+ */
 boxabs box_c(box a, box b) {
     boxabs ba = {0};
     ba.left = fmin(a.x - a.w / 2, b.x - b.w / 2);

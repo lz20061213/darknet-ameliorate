@@ -37,6 +37,8 @@
 #include "rnn_layer.h"
 #include "route_layer.h"
 #include "reweight_layer.h"
+#include "channel_slice_layer.h"
+#include "channel_shuffle_layer.h"
 #include "upsample_layer.h"
 #include "shortcut_layer.h"
 #include "softmax_layer.h"
@@ -95,6 +97,8 @@ LAYER_TYPE string_to_layer_type(char * type)
     if (strcmp(type, "[route]")==0) return ROUTE;
     if (strcmp(type, "[reweight]")==0) return REWEIGHT;
     if (strcmp(type, "[upsample]")==0) return UPSAMPLE;
+    if (strcmp(type, "[channel_slice]")==0) return CHANNEL_SLICE;
+    if (strcmp(type, "[channel_shuffle]")==0) return CHANNEL_SHUFFLE;
     return BLANK;
 }
 
@@ -945,6 +949,47 @@ reweight_layer parse_reweight(list *options, size_params params, network *net)
     return layer;
 }
 
+channel_slice_layer parse_channel_slice(list *options, size_params params, network *net){
+
+    int batch, h, w;
+    h = params.h;
+    w = params.w;
+    //c = params.c;
+    batch = params.batch;
+    char *l = option_find(options, "from");
+    int len = strlen(l);
+    if(!l) error("Channel Slice Layer must specify input layers");
+    int begin_slice_point = option_find_int(options, "start", 2);
+    int end_slice_point = option_find_int(options, "end", 2);
+    int axis = option_find_int(options, "axis", 1);
+    int n = 1;
+    int *layers = (int*)calloc(n,sizeof(int));
+    int* sizes = (int*)calloc(n, sizeof(int));
+    int *c = (int*)calloc(n, sizeof(int));
+    for(int i = 0; i < n; ++i){
+        int index = atoi(l);
+        l = strchr(l, ',')+1;
+        if(index < 0) index = params.index + index;
+        layers[i] = index;
+        sizes[i] = net->layers[index].outputs;
+        c[i] = net->layers[index].out_c;
+    }
+    channel_slice_layer layer = make_channel_slice_layer(batch, w, h, c[0], begin_slice_point, end_slice_point, axis, n, layers, sizes);
+    return layer;
+}
+
+layer parse_channel_shuffle(list *options, size_params params){
+
+    int batch,h,w,c;
+    h = params.h;
+    w = params.w;
+    c = params.c;
+    batch = params.batch;
+    int groups = option_find_int(options, "groups", 2);
+    layer l = make_channel_shuffle_layer(batch, w, h, c, groups);
+    return l;
+}
+
 learning_rate_policy get_policy(char *s)
 {
     if (strcmp(s, "random")==0) return RANDOM;
@@ -1183,6 +1228,10 @@ network *parse_network_cfg(char *filename)
             l = parse_route(options, params, net);
         }else if(lt == REWEIGHT){
             l = parse_reweight(options, params, net);
+        }else if(lt == CHANNEL_SLICE) {
+            l = parse_channel_slice(options, params, net);
+        }else if(lt == CHANNEL_SHUFFLE) {
+            l = parse_channel_shuffle(options, params);
         }else if(lt == UPSAMPLE){
             l = parse_upsample(options, params, net);
         }else if(lt == SHORTCUT){

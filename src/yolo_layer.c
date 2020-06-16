@@ -346,7 +346,7 @@ void forward_yolo_layer(const layer l, network net)
 
                 int mask_n = int_index(l.mask, n, l.n);
 
-                if (mask_n>=0 && is_positive) {
+                if (mask_n >= 0 && is_positive) {
 
                     int box_index = entry_index(l, b, mask_n*l.w*l.h + j*l.w + i, 0);
                     ious all_ious = delta_yolo_box(truth, l.output, l.biases, n, box_index, l.use_center_regression, i, j, l.w, l.h, net.w, net.h, l.delta, (2-truth.w*truth.h), l.w*l.h, l.iou_normalizer, l.iou_loss);

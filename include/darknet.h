@@ -102,7 +102,9 @@ typedef enum {
     UPSAMPLE,
     LOGXENT,
     L2NORM,
-    BLANK
+    BLANK,
+    CHANNEL_SLICE,
+    CHANNEL_SHUFFLE
 } LAYER_TYPE;
 
 typedef enum{
@@ -224,6 +226,11 @@ struct layer{
 
     int atss;
     // add for yolo layer
+
+    // shufflenet
+    int axis;
+    int begin_slice_point;
+    int end_slice_point;
 
     float alpha;
     float beta;
