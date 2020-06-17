@@ -877,6 +877,7 @@ void reset_network_state(network *net, int b);
 char **get_labels(char *filename);
 void do_nms_obj(detection *dets, int total, int classes, float thresh);
 void do_nms_sort(detection *dets, int total, int classes, float thresh);
+void diounms_sort(detection *dets, int total, int classes, float thresh, NMS_KIND nms_kind, float beta1);
 
 matrix make_matrix(int rows, int cols);
 

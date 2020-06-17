@@ -874,7 +874,13 @@ void validate_detector_flip(char *datacfg, char *cfgfile, char *weightfile, char
             int h = val[t].h;
             int num = 0;
             detection *dets = get_network_boxes(net, w, h, thresh, .5, map, 0, &num);
-            if (nms) do_nms_sort(dets, num, classes, nms);
+            if (nms) {
+                if (l.nms_kind == DEFAULT_NMS) {
+                    do_nms_sort(dets, num, classes, nms);
+                } else {
+                    diounms_sort(dets, num, classes, nms, l.nms_kind, l.beta_nms);
+                }
+            }
             if (coco){
                 print_cocos(fp, path, dets, num, classes, w, h);
             } else if (imagenet){
@@ -1003,7 +1009,13 @@ void validate_detector(char *datacfg, char *cfgfile, char *weightfile, char *out
             int nboxes = 0;
             detection *dets = get_network_boxes(net, w, h, thresh, .5, map, 0, &nboxes);
             //printf("after get detections\n");
-            if (nms) do_nms_sort(dets, nboxes, classes, nms);
+            if (nms) {
+                if (l.nms_kind == DEFAULT_NMS) {
+                    do_nms_sort(dets, nboxes, l.classes, nms);
+                } else {
+                    diounms_sort(dets, nboxes, l.classes, nms, l.nms_kind, l.beta_nms);
+                }
+            }
             //printf("after nms\n");
             if (coco){
                 print_cocos(fp, path, dets, nboxes, classes, w, h);
@@ -1143,7 +1155,13 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
         detection *dets = get_network_boxes(net, im.w, im.h, thresh, hier_thresh, 0, 1, &nboxes);
         //printf("%d\n", nboxes);
         //if (nms) do_nms_obj(boxes, probs, l.w*l.h*l.n, l.classes, nms);
-        if (nms) do_nms_sort(dets, nboxes, l.classes, nms);
+        if (nms) {
+            if (l.nms_kind == DEFAULT_NMS) {
+                do_nms_sort(dets, nboxes, l.classes, nms);
+            } else {
+                diounms_sort(dets, nboxes, l.classes, nms, l.nms_kind, l.beta_nms);
+            }
+        }
         draw_detections(im, dets, nboxes, thresh, names, alphabet, l.classes);
         free_detections(dets, nboxes);
         if(outfile){
