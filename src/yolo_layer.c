@@ -253,13 +253,14 @@ void forward_yolo_layer(const layer l, network net)
                         l.delta[obj_index] = two_way_max(0, 1 - lb_dis / l.lb_dis_max_thresh) - l.output[obj_index];
                     }
 
+                    // https://blog.csdn.net/linmingan/article/details/77885832
+                    // noobj should be different from obj
                     if (l.object_focal_loss) {
                         float alpha = 0.5;
                         // gamma = 2;
-                        float pt = l.output[obj_index] + 0.000000000000001F;
-                        float grad = -(1 - pt) * (2 * pt * logf(pt) + pt - 1);
+                        float pt = l.output[obj_index];
+                        float grad =  - 2 * pt * (1- pt) * logf(1 - pt) + pt * pt;
                         l.delta[obj_index] *= alpha * grad;
-
                     }
 
                     if (best_iou > l.ignore_thresh) {
