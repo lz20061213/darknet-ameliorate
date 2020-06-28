@@ -349,6 +349,8 @@ layer parse_yolo(list *options, size_params params)
     l.iou_normalizer = option_find_float_quiet(options, "iou_normalizer", 1);
     l.cls_normalizer = option_find_float_quiet(options, "cls_normalizer", 1);
 
+    l.label_smooth_rate = option_find_float_quiet(options, "label_smooth_rate", 0);
+
     char *iou_loss = option_find_str_quiet(options, "iou_loss", "mse");   //
     if (strcmp(iou_loss, "mse") == 0) l.iou_loss = MSE;
     else if (strcmp(iou_loss, "giou") == 0) l.iou_loss = GIOU;

@@ -219,6 +219,7 @@ struct layer{
     int object_focal_loss;
     float iou_normalizer;
     float cls_normalizer;
+    float label_smooth_rate;
     IOU_LOSS iou_loss;
     IOU_LOSS iou_thresh_kind;
     NMS_KIND nms_kind;
