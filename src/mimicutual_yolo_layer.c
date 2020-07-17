@@ -585,7 +585,7 @@ void forward_mimicutual_yolo_layer_gpu(const layer ls, network snet, network pne
         return;
     }
 
-    forward_mutual_yolo_layer(ls, snet, pnet, tnet);
+    forward_mimicutual_yolo_layer(ls, snet, pnet, tnet);
 
     cuda_set_device(snet.gpu_index);
     cuda_push_array(ls.delta_gpu, ls.delta, ls.batch*ls.outputs);
