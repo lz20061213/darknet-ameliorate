@@ -7,6 +7,17 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef OPENCV
+#include "opencv2/highgui/highgui_c.h"
+#include "opencv2/imgproc/imgproc_c.h"
+#include "opencv2/core/version.hpp"
+#if CV_MAJOR_VERSION == 3
+#include "opencv2/videoio/videoio_c.h"
+#include "opencv2/imgcodecs/imgcodecs_c.h"
+#endif
+IplImage *image_to_ipl(image im);
+#endif
+
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 list *get_paths(char *filename)

@@ -18,6 +18,7 @@ void *open_video_stream(const char *f, int c, int w, int h, int fps);
 image get_image_from_stream(void *p);
 image load_image_cv(char *filename, int channels);
 int show_image_cv(image im, const char* name, int ms);
+void make_window(char *name, int w, int h, int fullscreen);
 #endif
 
 float get_color(int c, int x, int max);

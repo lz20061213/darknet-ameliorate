@@ -82,6 +82,8 @@ void backward_bias_gpu(float *bias_updates, float *delta, int batch, int n, int 
 void logistic_x_ent_gpu(int n, float *pred, float *truth, float *delta, float *error);
 void softmax_x_ent_gpu(int n, float *pred, float *truth, float *delta, float *error);
 void smooth_l1_gpu(int n, float *pred, float *truth, float *delta, float *error);
+void add_l1_delta_gpu(int n, float scale, float *weight, float *delta);
+void add_consistent_l1_delta_gpu(int n, float scale, float *weight, float *sqrt_sum, float *delta);
 void l2_gpu(int n, float *pred, float *truth, float *delta, float *error);
 void l1_gpu(int n, float *pred, float *truth, float *delta, float *error);
 void l1_margin_gpu(int n, float *spred, float *ppred, float margin, float *delta, float *error);

@@ -1,5 +1,5 @@
 #include "darknet.h"
-
+#include "image.h"
 #include <sys/time.h>
 #include <assert.h>
 
