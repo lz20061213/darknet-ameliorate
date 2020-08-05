@@ -167,6 +167,10 @@ struct layer{
 
     int dilation; // add for dilation conv
 
+    int quantize; // add for quantization
+    int quantize_feature;
+    int scale_weight;
+
     int reverse;
     int flatten;
     int spatial;
@@ -298,7 +302,14 @@ struct layer{
     float * weights;
     float * weight_updates;
 
+    //for quantize
+    float * merge_weights;
+    float * scale_weights;
+    float * shift_biases;
+    float * merge_biases;
+
     float * delta;
+    float * x_stat_delta;
     float * output;
     float * mimic_truth;
     float * loss;
@@ -311,12 +322,15 @@ struct layer{
 
     float * mean_delta;
     float * variance_delta;
+    float * variance_delta_part;
 
     float * rolling_mean;
     float * rolling_variance;
 
     float * x;
     float * x_norm;
+    float * x_stat;
+    float * x_stat_sum;
 
     float * m;
     float * v;
@@ -348,6 +362,7 @@ struct layer{
     float *dc_cpu; 
 
     float * binary_input;
+    float * quantize_input;
 
     struct layer *input_layer;
     struct layer *self_layer;
@@ -443,29 +458,42 @@ struct layer{
     float * variance_gpu;
 
     float * rolling_mean_gpu;
+    float * rolling_mean_assign_gpu;
     float * rolling_variance_gpu;
+    float * rolling_variance_assign_gpu;
 
     float * variance_delta_gpu;
+    float * variance_delta_part_gpu;
     float * mean_delta_gpu;
 
     float * x_gpu;
     float * x_norm_gpu;
+    float * x_stat_gpu;
+    float * x_stat_sum_gpu;
     float * weights_gpu;
     float * weight_updates_gpu;
-    float * weight_change_gpu;
+    float * weight_updates_gpu_part;
 
     float * biases_gpu;
     float * bias_updates_gpu;
-    float * bias_change_gpu;
+    float * bias_updates_gpu_part;
+
+    // for quantize
+    float * merge_weights_gpu;
+    float * scale_weights_gpu;
+    float * shift_biases_gpu;
+    float * merge_biases_gpu;
+    float * quantize_input_gpu;
 
     float * scales_gpu;
     float * scale_updates_gpu;
-    float * scale_change_gpu;
+    float * scale_updates_gpu_part;
 
     float * output_gpu;
     float * mimic_truth_gpu;
     float * loss_gpu;
     float * delta_gpu;
+    float * x_stat_delta_gpu;
     float * rand_gpu;
     float * squared_gpu;
     float * norms_gpu;
@@ -556,6 +584,8 @@ typedef struct network{
     float *input;
     float *truth;
 
+    int quantize;
+
     // for mimic_training
     int *hint_layers;
     int *distill_layers;
@@ -563,6 +593,16 @@ typedef struct network{
 
     // for mutual_training
     int *mutual_layers;
+
+    // for quantize
+    int quantize_weight_bitwidth;
+    int quantize_weight_fraction_bitwidth;
+    int quantize_feature_bitwidth;
+    int quantize_feature_fraction_bitwidth;
+    int quantize_bias_bitwidth;
+    int quantize_bias_fraction_bitwidth;
+    int quantize_freezeBN;
+    int quantize_freezeBN_iterpoint;
 
     float *delta;
     float *workspace;

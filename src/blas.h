@@ -101,5 +101,18 @@ void flatten_gpu(float *x, int spatial, int layers, int batch, int forward, floa
 void softmax_tree(float *input, int spatial, int batch, int stride, float temp, float *output, tree hier);
 void upsample_gpu(float *in, int w, int h, int c, int batch, int stride, int forward, float scale, float *out);
 
+void quantize_gpu(float *x, int n, int total_bitwidth, int fraction_bitwidth);
+void scale_weights_gpu(float *weights, int nweights, int n, float *gamma, float *variance);
+void scale_outputs_gpu(float *outputs, float *variance, float *rolling_variance, int batch, int n, int size);
+void shift_bias_gpu(float *new_bias, int n, float *scales, float *bias, float *mean, float *variance);
+void backward_quantize_gpu(float *x_updates, float *x, int n, int total_bitwidth, int fraction_bitwidth);
+void backward_gamma_gpu(float *weights, float *delta, int c, int n, int size,  float *rolling_variance, float *update_scales);
+void backward_shift_gamma_gpu(float *scale_updates, int n, float *bias_updates, float *rolling_variance, float *mean, float *variance);
+void backward_mean_gpu(float *mean_updates, float *bias_updates, int n, float *scales_gpu, float *variance);
+void backward_variance_bias_gpu(float *variance_updates, float *bias_updates, int n, float *scales_gpu, float *mean, float *variance);
+void backward_variance_outputs_gpu(float *variance_updates, float *delta, int n, float *varicance, float *rolling_variance);
+void sum_outputs_gpu(float *outputs, float *mean, int batch, int filters, int spatial, float *x_stat_sum);
+void backward_stat_mean_var_gpu(float *x_stat_delta, float *delta_mean, float *delta_variance, int batch, int n, int size, float *x_stat, float *mean, float *x_stat_sum);
+
 #endif
 #endif

@@ -402,7 +402,7 @@ int get_double_yolo_detections(layer l, network net, int w, int h, int netw, int
                 //printf("class_index: %d\n", class_index);
                 float prob = objectness*predictions[class_index];
                 //printf("after get prob: %f, thresh: %f\n", prob, thresh);
-                float test = (prob > thresh) ? prob : 0.0;
+                //float test = (prob > thresh) ? prob : 0.0;
                 //printf("test: %f\n", test);
                 dets[count].prob[j] = (prob > thresh) ? prob : 0.0;
                 //printf("after set prob\n");

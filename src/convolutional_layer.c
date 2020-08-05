@@ -173,7 +173,7 @@ void cudnn_convolutional_setup(layer *l)
 #endif
 #endif
 
-convolutional_layer make_convolutional_layer(int batch, int h, int w, int c, int n, int groups, int size, int stride, int dilation, int padding, ACTIVATION activation, int batch_normalize, int binary, int xnor, int adam)
+convolutional_layer make_convolutional_layer(int batch, int h, int w, int c, int n, int groups, int size, int stride, int dilation, int padding, ACTIVATION activation, int batch_normalize, int binary, int xnor, int adam, int quantize)
 {
     int i;
     convolutional_layer l = {0};
@@ -232,6 +232,15 @@ convolutional_layer make_convolutional_layer(int batch, int h, int w, int c, int
         l.binary_input = calloc(l.inputs*l.batch, sizeof(float));
     }
 
+    l.quantize = quantize;
+    if(quantize) {
+        l.merge_weights = calloc(l.nweights, sizeof(float));
+        l.scale_weights = calloc(l.nweights, sizeof(float));
+        l.shift_biases = calloc(n, sizeof(float));
+        l.merge_biases = calloc(n, sizeof(float));
+        l.quantize_input = calloc(l.inputs*l.batch, sizeof(float));
+    }
+
     if(batch_normalize){
         l.scales = calloc(n, sizeof(float));
         l.scale_updates = calloc(n, sizeof(float));
@@ -249,6 +258,13 @@ convolutional_layer make_convolutional_layer(int batch, int h, int w, int c, int
         l.rolling_variance = calloc(n, sizeof(float));
         l.x = calloc(l.batch*l.outputs, sizeof(float));
         l.x_norm = calloc(l.batch*l.outputs, sizeof(float));
+
+        if (quantize) {
+            l.variance_delta_part = calloc(n, sizeof(float));
+            l.x_stat = calloc(l.batch*l.outputs, sizeof(float));
+            l.x_stat_sum = calloc(n, sizeof(float));
+            l.x_stat_delta = calloc(l.batch*l.outputs, sizeof(float));
+        }
     }
     if(adam){
         l.m = calloc(l.nweights, sizeof(float));
@@ -291,6 +307,16 @@ convolutional_layer make_convolutional_layer(int batch, int h, int w, int c, int
             l.binary_input_gpu = cuda_make_array(0, l.inputs*l.batch);
         }
 
+        if(quantize) {
+            l.merge_weights_gpu = cuda_make_array(l.merge_weights, l.nweights);
+            l.scale_weights_gpu = cuda_make_array(l.scale_weights, l.nweights);
+            l.shift_biases_gpu = cuda_make_array(l.shift_biases, n);
+            l.merge_biases_gpu = cuda_make_array(l.merge_biases, n);
+            l.quantize_input_gpu = cuda_make_array(0, l.inputs*l.batch);
+            l.weight_updates_gpu_part = cuda_make_array(l.weight_updates, l.nweights);
+            l.bias_updates_gpu_part = cuda_make_array(l.bias_updates, n);
+        }
+
         if(batch_normalize){
             l.mean_gpu = cuda_make_array(l.mean, n);
             l.variance_gpu = cuda_make_array(l.variance, n);
@@ -300,6 +326,14 @@ convolutional_layer make_convolutional_layer(int batch, int h, int w, int c, int
 
             l.mean_delta_gpu = cuda_make_array(l.mean, n);
             l.variance_delta_gpu = cuda_make_array(l.variance, n);
+
+            if (quantize) {
+                l.variance_delta_part_gpu = cuda_make_array(l.variance, n);
+                l.x_stat_gpu = cuda_make_array(l.output, l.batch*out_h*out_w*n);
+                l.x_stat_sum_gpu = cuda_make_array(l.x_stat_sum, l.n);
+                l.x_stat_delta_gpu = cuda_make_array(l.delta, l.batch*out_h*out_w*n);
+                l.scale_updates_gpu_part = cuda_make_array(l.scale_updates, n);
+            }
 
             l.scales_gpu = cuda_make_array(l.scales, n);
             l.scale_updates_gpu = cuda_make_array(l.scale_updates, n);
@@ -386,6 +420,14 @@ void resize_convolutional_layer(convolutional_layer *l, int w, int h)
     if(l->batch_normalize){
         l->x = realloc(l->x, l->batch*l->outputs*sizeof(float));
         l->x_norm  = realloc(l->x_norm, l->batch*l->outputs*sizeof(float));
+        if(l->quantize) {
+            l->x_stat = realloc(l->x_stat, l->batch*l->outputs*sizeof(float));
+            l->x_stat_delta = realloc(l->x_stat_delta, l->batch*l->outputs*sizeof(float));
+        }
+    }
+
+    if(l->quantize) {
+        l->quantize_input = realloc(l->quantize_input, l->batch*l->inputs*sizeof(float));
     }
 
 #ifdef GPU
@@ -401,6 +443,18 @@ void resize_convolutional_layer(convolutional_layer *l, int w, int h)
 
         l->x_gpu = cuda_make_array(l->output, l->batch*l->outputs);
         l->x_norm_gpu = cuda_make_array(l->output, l->batch*l->outputs);
+
+        if (l->quantize) {
+            cuda_free(l->x_stat_gpu);
+            cuda_free(l->x_stat_delta_gpu);
+            l->x_stat_gpu = cuda_make_array(l->output, l->batch*l->outputs);
+            l->x_stat_delta_gpu = cuda_make_array(l->delta,  l->batch*l->outputs);
+        }
+    }
+
+    if(l->quantize) {
+        cuda_free(l->quantize_input_gpu);
+        l->quantize_input_gpu = cuda_make_array(l->quantize_input, l->batch*l->inputs);
     }
 #ifdef CUDNN
     cudnn_convolutional_setup(l);

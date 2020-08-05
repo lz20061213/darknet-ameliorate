@@ -727,3 +727,17 @@ float **one_hot_encode(float *a, int n, int k)
 float two_way_max(float a, float b) {
     return (a > b) ? a : b;
 }
+
+void quantize(float *x, int n, int total_bitwidth, int fraction_bitwidth)
+{
+    int integer_bitwidth = total_bitwidth - fraction_bitwidth;
+    float bound = pow(2, integer_bitwidth - 1);
+    float shift = pow(2, fraction_bitwidth);
+
+    int i;
+    for(i = 0; i < n; i++) {
+        float element = x[i];
+        element = round(element * shift) / shift;
+        x[i] = constrain(-bound, bound, element);
+    }
+}

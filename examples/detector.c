@@ -61,6 +61,15 @@ void train_detector(char *datacfg, char *cfgfile, char *weightfile, int *gpus, i
     int count = 0;
     //while(i*imgs < N*120){
     while(get_current_batch(net) < net->max_batches){
+        #pragma omp parallel for
+        for(i = 0; i < ngpus; ++i){
+            if(get_current_batch(net) > net->quantize_freezeBN_iterpoint) {
+                nets[i]->quantize_freezeBN = 1;
+            }
+            else {
+                nets[i]->quantize_freezeBN = 0;
+            }
+        }
         if(l.random && count++%10 == 0){
             printf("Resizing\n");
             int dim = (rand() % 10 + 10) * 32;

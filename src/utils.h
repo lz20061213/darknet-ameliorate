@@ -49,5 +49,7 @@ float sec(clock_t clocks);
 void print_statistics(float *a, int n);
 int int_index(int *a, int val, int n);
 float two_way_max(float a, float b);
+// for quantize
+void quantize(float *x, int n, int total_bitwidth, int fraction_bitwidth);
 #endif
 

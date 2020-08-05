@@ -216,10 +216,13 @@ convolutional_layer parse_convolutional(list *options, size_params params)
     int batch_normalize = option_find_int_quiet(options, "batch_normalize", 0);
     int binary = option_find_int_quiet(options, "binary", 0);
     int xnor = option_find_int_quiet(options, "xnor", 0);
+    int quantize = option_find_int_quiet(options, "quantize", 0);
 
-    convolutional_layer layer = make_convolutional_layer(batch,h,w,c,n,groups,size,stride,dilation,padding,activation, batch_normalize, binary, xnor, params.net->adam);
+    convolutional_layer layer = make_convolutional_layer(batch,h,w,c,n,groups,size,stride,dilation,padding,activation, batch_normalize, binary, xnor, params.net->adam, quantize);
     layer.flipped = option_find_int_quiet(options, "flipped", 0);
     layer.dot = option_find_float_quiet(options, "dot", 0);
+    layer.quantize_feature = option_find_int_quiet(options, "quantize_feature", 1);
+    layer.scale_weight = option_find_int_quiet(options, "scale_weight", 0);
 
     return layer;
 }
@@ -1127,6 +1130,15 @@ void parse_net_options(list *options, network *net)
     net->distill_layers = distill_layers;
     net->mutual_layers = mutual_layers;
     net->num_mimic_layer = n;
+
+    net->quantize = option_find_int_quiet(options, "quantize", 0);
+    net->quantize_weight_bitwidth = option_find_int_quiet(options, "weight_bitwidth", 8);
+    net->quantize_weight_fraction_bitwidth = option_find_int_quiet(options, "weight_fraction_bitwidth", 6);
+    net->quantize_feature_bitwidth = option_find_int_quiet(options, "feature_bitwidth", 8);
+    net->quantize_feature_fraction_bitwidth = option_find_int_quiet(options, "feature_fraction_bitwidth", 3);
+    net->quantize_bias_bitwidth = option_find_int_quiet(options, "bias_bitwidth", 16);
+    net->quantize_bias_fraction_bitwidth = option_find_int_quiet(options, "bias_fraction_bitwidth", 10);
+    net->quantize_freezeBN_iterpoint = option_find_int_quiet(options, "quantize_freezeBN_iterpoint", 30000);
 }
 
 int is_network(section *s)
@@ -1620,6 +1632,11 @@ void load_convolutional_weights(layer l, FILE *fp)
     }
     fread(l.weights, sizeof(float), num, fp);
 
+    // CHECK /255 for the first convolution in training
+    if(l.quantize && l.scale_weight) {
+        scal_cpu(l.nweights, 1 / 255., l.weights, 1);
+    }
+
     //printf("l.weights: %f %f %f\n", l.weights[0], l.weights[1], l.weights[2]);
 
     //if(l.c == 3) scal_cpu(num, 1./256, l.weights, 1);
@@ -1728,5 +1745,41 @@ void load_weights_upto(network *net, char *filename, int start, int cutoff)
 void load_weights(network *net, char *filename)
 {
     load_weights_upto(net, filename, 0, net->n);
+}
+
+void fuse_conv_batchnorm(network *net)
+{
+    int j;
+    for (j = 0; j < net->n; ++j) {
+
+        layer *l = &net->layers[j];
+        if (l->type == CONVOLUTIONAL) {
+
+            if (l->batch_normalize) {
+                int f;
+                for (f = 0; f < l->n; ++f)
+                {
+                    l->biases[f] = l->biases[f] - (double)l->scales[f] * l->rolling_mean[f] / (sqrt((double)l->rolling_variance[f] + .00001));
+
+                    const size_t filter_size = l->size*l->size*l->c / l->groups;
+                    int i;
+                    for (i = 0; i < filter_size; ++i) {
+                        int w_index = f*filter_size + i;
+                        l->weights[w_index] = (double)l->weights[w_index] * l->scales[f] / (sqrt((double)l->rolling_variance[f] + .00001));
+                    }
+                }
+
+                l->batch_normalize = 0;
+#ifdef GPU
+                if (gpu_index >= 0) {
+                    push_convolutional_layer(*l);
+                }
+#endif
+            }
+        }
+        else {
+            //printf(" Fusion skip layer type: %d \n", l->type);
+        }
+    }
 }
 

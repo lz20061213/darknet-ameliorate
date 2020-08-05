@@ -207,6 +207,38 @@ void print_weights(char *cfgfile, char *weightfile, int n)
     //printf("]");
 }
 
+//convolutional_layer make_convolutional_layer(int batch, int h, int w, int c, int n, int groups, int size, int stride, int dilation, int padding, ACTIVATION activation, int batch_normalize, int binary, int xnor, int adam, int quantize)
+
+void test_convolutional_layer(char *cfgfile, char *weightfile, char *imagefile)
+{
+    network *net = load_network(cfgfile, weightfile, 0);
+    image im = make_image(32, 32, 3);
+    fill_image(im, 1);
+    int i, j, k;
+    for(k=0; k<im.c; ++k) {
+        float scale = (k+1);
+        for(j=0; j<im.h*im.w; ++j) {
+            im.data[k*im.h*im.w+j] *= scale;
+        }
+    }
+    net->input = im.data;
+    net->quantize_freezeBN = 1;
+    //cuda_set_device(net->gpu_index);
+    //cuda_push_array(net->input_gpu, net->input, net->inputs*net->batch);
+    forward_network(net);
+    layer l = net->layers[net->n-1];
+    cuda_pull_array(l.output_gpu, l.output, l.batch*l.outputs);
+//    printf("network ouput: \n");
+//    for(j=0; j<l.out_h; j++) {
+//        for(k=0; k<l.out_w; k++) {
+//            printf("%f ", l.output[j*l.out_w+k]);
+//        }
+//        printf("\n");
+//    }
+    fill_gpu(l.batch*l.outputs, 1, l.delta_gpu, 1);
+    backward_network(net);
+}
+
 void rescale_net(char *cfgfile, char *weightfile, char *outfile)
 {
     gpu_index = -1;
@@ -429,6 +461,8 @@ int main(int argc, char **argv)
         run_lsd(argc, argv);
     } else if (0 == strcmp(argv[1], "detector")){
         run_detector(argc, argv);
+    } else if (0 == strcmp(argv[1], "test_quantize")) {
+        test_convolutional_layer(argv[2], argv[3], argv[4]);
     } else if (0 == strcmp(argv[1], "detect")){
         float thresh = find_float_arg(argc, argv, "-thresh", .5);
         char *filename = (argc > 4) ? argv[4]: 0;
@@ -459,7 +493,7 @@ int main(int argc, char **argv)
         run_tag(argc, argv);
     } else if (0 == strcmp(argv[1], "3d")){
         composite_3d(argv[2], argv[3], argv[4], (argc > 5) ? atof(argv[5]) : 0);
-    } else if (0 == strcmp(argv[1], "test")){
+    } else if (0 == strcmp(argv[1], "test_resize")){
         test_resize(argv[2]);
     } else if (0 == strcmp(argv[1], "nightmare")){
         run_nightmare(argc, argv);

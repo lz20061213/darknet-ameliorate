@@ -446,6 +446,13 @@ float train_network(network *net, data d)
     int n = d.X.rows / batch;
 
     int i;
+
+    if (net->quantize) {
+        for (i = 0; i < d.X.rows; ++i) {
+            scal_cpu(d.X.cols, 255.0, d.X.vals[i], 1);
+        }
+    }
+
     float sum = 0;
     for(i = 0; i < n; ++i){
         get_next_batch(d, batch, i*batch, net->input, net->truth);
