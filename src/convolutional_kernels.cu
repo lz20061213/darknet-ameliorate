@@ -317,6 +317,9 @@ void forward_convolutional_layer_gpu(convolutional_layer l, network net)
         }
     }
 
+    if (l.activation == SWISH)
+        copy_gpu(l.batch*l.outputs, l.output_gpu, 1, l.output_afterbn_gpu, 1);
+
     activate_array_gpu(l.output_gpu, l.outputs*l.batch, l.activation);
 
     //if(l.dot > 0) dot_error_gpu(l);
@@ -371,7 +374,11 @@ void backward_convolutional_layer_gpu(convolutional_layer l, network net)
         smooth_layer(l, 5, l.smooth);
     }
     //constrain_gpu(l.outputs*l.batch, 1, l.delta_gpu, 1);
-    gradient_array_gpu(l.output_gpu, l.outputs*l.batch, l.activation, l.delta_gpu);
+    if (l.activation == SWISH) {
+        gradient_array_gpu(l.output_afterbn_gpu, l.outputs*l.batch, l.activation, l.delta_gpu);
+    } else {
+        gradient_array_gpu(l.output_gpu, l.outputs*l.batch, l.activation, l.delta_gpu);
+    }
 
     // CHECK since the gradient accumulate each backward, so there need to use temp updates
     if(l.quantize) {

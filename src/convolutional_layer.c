@@ -217,6 +217,8 @@ convolutional_layer make_convolutional_layer(int batch, int h, int w, int c, int
     l.inputs = l.w * l.h * l.c;
 
     l.output = calloc(l.batch*l.outputs, sizeof(float));
+    if (l.activation == SWISH)
+        l.output_afterbn = calloc(l.batch*l.outputs, sizeof(float));
     l.delta  = calloc(l.batch*l.outputs, sizeof(float));
 
     l.forward = forward_convolutional_layer;
@@ -298,6 +300,8 @@ convolutional_layer make_convolutional_layer(int batch, int h, int w, int c, int
 
         l.delta_gpu = cuda_make_array(l.delta, l.batch*out_h*out_w*n);
         l.output_gpu = cuda_make_array(l.output, l.batch*out_h*out_w*n);
+        if (l.activation == SWISH)
+            l.output_afterbn_gpu = cuda_make_array(l.output_afterbn, l.batch*out_h*out_w*n);
 
         if(binary){
             l.binary_weights_gpu = cuda_make_array(l.weights, l.nweights);

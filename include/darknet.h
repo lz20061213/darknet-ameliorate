@@ -241,6 +241,8 @@ struct layer{
     float beta;
     float kappa;
 
+    int isprune;  // for slimming
+
     float coord_scale;
     float object_scale;
     float noobject_scale;
@@ -311,6 +313,7 @@ struct layer{
     float * delta;
     float * x_stat_delta;
     float * output;
+    float * output_afterbn;
     float * mimic_truth;
     float * loss;
     float * squared;
@@ -490,6 +493,7 @@ struct layer{
     float * scale_updates_gpu_part;
 
     float * output_gpu;
+    float * output_afterbn_gpu;
     float * mimic_truth_gpu;
     float * loss_gpu;
     float * delta_gpu;
@@ -514,7 +518,7 @@ struct layer{
 void free_layer(layer);
 
 typedef enum {
-    CONSTANT, STEP, EXP, POLY, STEPS, SIG, RANDOM, COSINE
+    CONSTANT, STEP, EXP, POLY, STEPS, SIG, RANDOM, COSINE, SGDR
 } learning_rate_policy;
 
 typedef struct network{
@@ -529,6 +533,7 @@ typedef struct network{
     learning_rate_policy policy;
 
     float learning_rate;
+    float learning_rate_min;
     float momentum;
     float decay;
     float gamma;
@@ -537,6 +542,7 @@ typedef struct network{
     int time_steps;
     int step;
     int max_batches;
+    int batches_per_cycle;
     float *scales;
     int   *steps;
     int num_steps;
@@ -544,6 +550,15 @@ typedef struct network{
 
     // for cosine learning rate
     float alpha;
+
+    // for sgdr learning policy
+    float batches_cycle_mult;
+
+    // for slimming-scale sparse rate
+    int train_slimming;
+    int consistent_slimming;
+    float slimming_scale;
+    float slimming_alpha;
 
     int adam;
     float B1;

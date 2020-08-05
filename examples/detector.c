@@ -4,6 +4,20 @@ static int coco_ids[] = {1,2,3,4,5,6,7,8,9,10,11,13,14,15,16,17,18,19,20,21,22,2
 
 #define SAVE_EVERY 1000
 
+
+void scale_gamma(network* net, float alpha) {
+    cuda_set_device(net->gpu_index);
+    int i;
+    for(i = 0; i < net->n; ++i) {
+        layer l = net->layers[i];
+        if (l.isprune) {
+            scal_gpu(l.n, alpha, l.scales_gpu, 1);
+            scal_gpu(l.nweights, 1. / alpha, l.weights_gpu, 1);
+            scal_gpu(l.n, 1.0 / alpha, l.rolling_mean_gpu, 1);
+        }
+    }
+}
+
 void train_detector(char *datacfg, char *cfgfile, char *weightfile, int *gpus, int ngpus, int clear)
 {
     list *options = read_data_cfg(datacfg);
@@ -29,6 +43,13 @@ void train_detector(char *datacfg, char *cfgfile, char *weightfile, int *gpus, i
     }
     srand(time(0));
     network *net = nets[0];
+
+#ifdef GPU
+    // scale the conv weights and its bias
+    for (i = 0; i < ngpus; ++i) {
+        if (nets[i]->train_slimming) scale_gamma(nets[i], nets[i]->slimming_alpha);
+    }
+#endif
 
     int imgs = net->batch * net->subdivisions * ngpus;
     printf("Learning Rate: %g, Momentum: %g, Decay: %g\n", net->learning_rate, net->momentum, net->decay);
@@ -143,7 +164,17 @@ void train_detector(char *datacfg, char *cfgfile, char *weightfile, int *gpus, i
 #endif
             char buff[256];
             sprintf(buff, "%s/%s.backup", backup_directory, base);
+
+#ifdef GPU
+            // scale the conv weights and its bias back
+            if (net->train_slimming) scale_gamma(net, 1.0 / net->slimming_alpha);
+#endif
             save_weights(net, buff);
+
+#ifdef GPU
+            // scale the conv weights and its bias
+            if (net->train_slimming) scale_gamma(net, net->slimming_alpha);
+#endif
         }
         if(i%10000==0 || (i < 1000 && i%100 == 0)){
 #ifdef GPU
@@ -151,7 +182,17 @@ void train_detector(char *datacfg, char *cfgfile, char *weightfile, int *gpus, i
 #endif
             char buff[256];
             sprintf(buff, "%s/%s_%d.weights", backup_directory, base, i);
+
+#ifdef GPU
+            // scale the conv weights and its bias back
+            if (net->train_slimming) scale_gamma(net, 1.0 / net->slimming_alpha);
+#endif
             save_weights(net, buff);
+
+#ifdef GPU
+            // scale the conv weights and its bias
+            if (net->train_slimming) scale_gamma(net, net->slimming_alpha);
+#endif
         }
         free_data(train);
     }
@@ -160,6 +201,12 @@ void train_detector(char *datacfg, char *cfgfile, char *weightfile, int *gpus, i
 #endif
     char buff[256];
     sprintf(buff, "%s/%s_final.weights", backup_directory, base);
+
+#ifdef GPU
+    // scale the conv weights and its bias back
+    if (net->train_slimming) scale_gamma(net, 1.0 / net->slimming_alpha);
+#endif
+
     save_weights(net, buff);
 }
 

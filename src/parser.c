@@ -223,6 +223,7 @@ convolutional_layer parse_convolutional(list *options, size_params params)
     layer.dot = option_find_float_quiet(options, "dot", 0);
     layer.quantize_feature = option_find_int_quiet(options, "quantize_feature", 1);
     layer.scale_weight = option_find_int_quiet(options, "scale_weight", 0);
+    layer.isprune = option_find_int_quiet(options, "isprune", 0);
 
     return layer;
 }
@@ -1005,6 +1006,7 @@ learning_rate_policy get_policy(char *s)
     if (strcmp(s, "sigmoid")==0) return SIG;
     if (strcmp(s, "steps")==0) return STEPS;
     if (strcmp(s, "cosine") == 0) return COSINE;
+    if (strcmp(s, "sgdr") == 0) return SGDR;
     fprintf(stderr, "Couldn't find policy %s, going with constant\n", s);
     return CONSTANT;
 }
@@ -1013,6 +1015,11 @@ void parse_net_options(list *options, network *net)
 {
     net->batch = option_find_int(options, "batch",1);
     net->learning_rate = option_find_float(options, "learning_rate", .001);
+
+    net->learning_rate_min = option_find_float_quiet(options, "learning_rate_min", .00001);
+    net->batches_per_cycle = option_find_int_quiet(options, "sgdr_cycle", 1000);
+    net->batches_cycle_mult = option_find_int_quiet(options, "sgdr_mult", 2);
+
     net->momentum = option_find_float(options, "momentum", .9);
     net->decay = option_find_float(options, "decay", .0001);
     int subdivs = option_find_int(options, "subdivisions",1);
@@ -1048,6 +1055,11 @@ void parse_net_options(list *options, network *net)
     net->exposure = option_find_float_quiet(options, "exposure", 1);
     net->hue = option_find_float_quiet(options, "hue", 0);
     net->openscale = option_find_int_quiet(options, "openscale", 0);
+
+    net->train_slimming = option_find_int_quiet(options, "train_slimming", 0);
+    net->consistent_slimming = option_find_int_quiet(options, "consistent_slimming", 0);
+    net->slimming_scale = option_find_float_quiet(options, "slimming_scale", 0.0001);
+    net->slimming_alpha = option_find_float_quiet(options, "slimming_alpha", 0.1);
 
     net->filter_thresh = option_find_float_quiet(options, "filter_thresh", 0);
 

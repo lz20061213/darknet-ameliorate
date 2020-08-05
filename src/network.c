@@ -127,6 +127,18 @@ float get_current_rate(network *net)
         case COSINE:
             rate = net->alpha;
             return net->learning_rate * ((1 - rate) * 0.5 * (1 + cos(TWO_PI / 2 * (float) batch_num / net->max_batches)) + rate);
+        case SGDR:
+        {
+            int last_iter_start = 0;
+            int cycle_size = net->batches_per_cycle;
+            while ((last_iter_start + cycle_size) < batch_num)
+            {
+                last_iter_start += cycle_size;
+                cycle_size *= net->batches_cycle_mult;
+            }
+            rate = net->learning_rate_min + 0.5*(net->learning_rate - net->learning_rate_min)*(1. + cos((float)(batch_num - last_iter_start)*TWO_PI/cycle_size));
+            return rate;
+        }
         default:
             fprintf(stderr, "Policy is weird!\n");
             return net->learning_rate;
@@ -364,12 +376,79 @@ void backward_network(network *netp)
     }
 }
 
+// penalty for slimming sparse scale
+// there maybe some question
+void updateBN(network *net) {
+    int i, j;
+    int *penalty = calloc(net->n, sizeof(int));
+    memset(penalty, 0, net->n * sizeof(int));
+    if (net->consistent_slimming) {
+        i = net->n;
+        while (i>=0) {
+            layer l = net->layers[i];
+            if (l.type != SHORTCUT) {
+                i--;
+                continue;
+            }
+            int* indexes = calloc(10, sizeof(int));
+            int count = 0;
+            int next_index = -1;
+            while (l.type == SHORTCUT) {
+                indexes[count] = l.current_layer_index -1;
+                count++;
+                next_index = l.index;
+                l = net->layers[next_index];
+            }
+            indexes[count] = next_index;
+            count++;
+            // do consistent l1-loss, which means l1,2 loss for a matrix,  | sqrt(||X(i, :)||2) |
+            int out_c = net->layers[indexes[0]].out_c;
+            float* sqrt_row = calloc(out_c, sizeof(float));
+            memset(sqrt_row, 0, out_c * sizeof(float));
+            float* sqrt_row_gpu = cuda_make_array(sqrt_row, out_c);
+            layer corrl;
+            for(j=0; j<count; ++j) {
+                corrl = net->layers[indexes[j]];
+                if (corrl.isprune)
+                    add_pow_gpu(out_c, 2, corrl.scales_gpu, 1, sqrt_row_gpu, 1);
+            }
+            pow_gpu(out_c, 0.5, sqrt_row_gpu, 1, sqrt_row_gpu, 1);
+
+            for(j=0; j<count; ++j) {
+                corrl = net->layers[indexes[j]];
+                // add corr-l1 loss
+                if (corrl.isprune) {
+                    add_consistent_l1_delta_gpu(out_c, -net->slimming_scale, corrl.scales_gpu, sqrt_row_gpu,
+                                corrl.scale_updates_gpu);
+                    penalty[indexes[j]] = 1;
+                }
+            }
+
+            // release the memory
+            cuda_free(sqrt_row_gpu);
+            free(sqrt_row);
+            free(indexes);
+
+            i = next_index - 1;
+        }
+    }
+
+    // add l1 loss for corresponding layers (eltwise),  |sum(|gamma|)|
+    for (i=0; i < net->n; ++i) {
+        layer l = net->layers[i];
+        if (l.isprune && penalty[i] == 0) {
+            add_l1_delta_gpu(l.out_c, -net->slimming_scale, l.scales_gpu, l.scale_updates_gpu);
+        }
+    }
+}
+
 float train_network_datum(network *net)
 {
     *net->seen += net->batch;
     net->train = 1;
     forward_network(net);
     backward_network(net);
+    if (net->train_slimming) updateBN(net);
     float error = *net->cost;
     if(((*net->seen)/net->batch)%net->subdivisions == 0) update_network(net);
     return error;

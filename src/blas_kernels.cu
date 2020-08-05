@@ -557,6 +557,12 @@ __global__ void pow_kernel(int N, float ALPHA, float *X, int INCX, float *Y, int
     if(i < N) Y[i*INCY] = pow(X[i*INCX], ALPHA);
 }
 
+__global__ void add_pow_kernel(int N, float ALPHA, float *X, int INCX, float *Y, int INCY)
+{
+    int i = (blockIdx.x + blockIdx.y*gridDim.x) * blockDim.x + threadIdx.x;
+    if(i < N) Y[i*INCY] += pow(X[i*INCX], ALPHA);
+}
+
 __global__ void const_kernel(int N, float ALPHA, float *X, int INCX)
 {
     int i = (blockIdx.x + blockIdx.y*gridDim.x) * blockDim.x + threadIdx.x;
@@ -765,6 +771,12 @@ extern "C" void axpy_gpu(int N, float ALPHA, float * X, int INCX, float * Y, int
 extern "C" void pow_gpu(int N, float ALPHA, float * X, int INCX, float * Y, int INCY)
 {
     pow_kernel<<<cuda_gridsize(N), BLOCK>>>(N, ALPHA, X, INCX, Y, INCY);
+    check_error(cudaPeekAtLastError());
+}
+
+extern "C" void add_pow_gpu(int N, float ALPHA, float * X, int INCX, float * Y, int INCY)
+{
+    add_pow_kernel<<<cuda_gridsize(N), BLOCK>>>(N, ALPHA, X, INCX, Y, INCY);
     check_error(cudaPeekAtLastError());
 }
 
@@ -1000,6 +1012,34 @@ __global__ void smooth_l1_kernel(int n, float *pred, float *truth, float *delta,
 extern "C" void smooth_l1_gpu(int n, float *pred, float *truth, float *delta, float *error)
 {
     smooth_l1_kernel<<<cuda_gridsize(n), BLOCK>>>(n, pred, truth, delta, error);
+    check_error(cudaPeekAtLastError());
+}
+
+__global__ void add_l1_delta_kernel(int n, float scale, float *weight, float *delta)
+{
+    int i = (blockIdx.x + blockIdx.y*gridDim.x) * blockDim.x + threadIdx.x;
+    if(i < n){
+        delta[i] += scale * ((weight[i] > 0) ? 1 : -1);
+    }
+}
+
+extern "C" void add_l1_delta_gpu(int n, float scale, float *weight, float *delta)
+{
+    add_l1_delta_kernel<<<cuda_gridsize(n), BLOCK>>>(n, scale, weight, delta);
+    check_error(cudaPeekAtLastError());
+}
+
+__global__ void add_consistent_l1_delta_kernel(int n, float scale, float *weight, float *sqrt_sum, float *delta)
+{
+    int i = (blockIdx.x + blockIdx.y*gridDim.x) * blockDim.x + threadIdx.x;
+    if(i < n){
+        delta[i] += scale * (weight[i] / sqrt_sum[i]);
+    }
+}
+
+extern "C" void add_consistent_l1_delta_gpu(int n, float scale, float *weight, float *sqrt_sum, float *delta)
+{
+    add_consistent_l1_delta_kernel<<<cuda_gridsize(n), BLOCK>>>(n, scale, weight, sqrt_sum, delta);
     check_error(cudaPeekAtLastError());
 }
 
