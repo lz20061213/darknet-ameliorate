@@ -209,8 +209,6 @@ struct layer{
     int *mask;
     int total;
 
-    int downsample_scale;
-
     // add for yolo layer
     float scale_xy;
 
@@ -594,6 +592,8 @@ typedef struct network{
     float data_fusion_prob;
     // mosaic split offset ratio
     float mosaic_min_offset;
+
+    int downsample_scale;
 
     int gpu_index;
     tree *hierarchy;
