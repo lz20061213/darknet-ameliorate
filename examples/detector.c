@@ -102,8 +102,8 @@ void train_detector(char *datacfg, char *cfgfile, char *weightfile, int *gpus, i
             int dim_w = randi * net->downsample_scale + init_w;
             int dim_h = randi * net->downsample_scale + init_h;
             if (get_current_batch(net)+200 > net->max_batches) {
-                dim_w = 9 * net->downsample_scale + init_w;
-                dim_h = 9 * net->downsample_scale + init_h;
+                dim_w = 10 * net->downsample_scale + init_w;
+                dim_h = 10 * net->downsample_scale + init_h;
             }
             //int dim = (rand() % 4 + 16) * 32;
             printf("input: %d %d\n", dim_w, dim_h);
