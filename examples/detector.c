@@ -94,12 +94,17 @@ void train_detector(char *datacfg, char *cfgfile, char *weightfile, int *gpus, i
         }
         if(l.random && count++%10 == 0){
             printf("Resizing\n");
-            int dim = (rand() % 10 + 10) * 32;
-            if (get_current_batch(net)+200 > net->max_batches) dim = 608;
+            int randi = rand_int(-5, 10);
+            int dim_w = randi * net->downsample_scale + net->w;
+            int dim_h = randi * net->downsample_scale + net->h;
+            if (get_current_batch(net)+200 > net->max_batches) {
+                dim_w = 9 * net->downsample_scale + net->w;;
+                dim_h = 9 * net->downsample_scale + net->h;;
+            }
             //int dim = (rand() % 4 + 16) * 32;
-            printf("%d\n", dim);
-            args.w = dim;
-            args.h = dim;
+            printf("input: %d %d\n", dim_w, dim_h);
+            args.w = dim_w;
+            args.h = dim_h;
 
             pthread_join(load_thread, 0);
             train = buffer;
@@ -108,7 +113,7 @@ void train_detector(char *datacfg, char *cfgfile, char *weightfile, int *gpus, i
 
             #pragma omp parallel for
             for(i = 0; i < ngpus; ++i){
-                resize_network(nets[i], dim, dim);
+                resize_network(nets[i], dim_w, dim_h);
             }
             net = nets[0];
         }
@@ -177,13 +182,13 @@ void train_detector(char *datacfg, char *cfgfile, char *weightfile, int *gpus, i
             if (net->train_slimming) scale_gamma(net, net->slimming_alpha);
 #endif
         }
-        if(i%10000==0 || (i < 1000 && i%100 == 0)){
+        if((i-last_save) > SAVE_EVERY || i % SAVE_EVERY == 0 || (i < SAVE_EVERY && i % 100 == 0)){
 #ifdef GPU
             if(ngpus != 1) sync_nets(nets, ngpus, 0);
 #endif
             char buff[256];
             sprintf(buff, "%s/%s_%d.weights", backup_directory, base, i);
-
+            last_save = i;
 #ifdef GPU
             // scale the conv weights and its bias back
             if (net->train_slimming) scale_gamma(net, 1.0 / net->slimming_alpha);

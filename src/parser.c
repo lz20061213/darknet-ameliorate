@@ -1151,6 +1151,8 @@ void parse_net_options(list *options, network *net)
     net->quantize_bias_bitwidth = option_find_int_quiet(options, "bias_bitwidth", 16);
     net->quantize_bias_fraction_bitwidth = option_find_int_quiet(options, "bias_fraction_bitwidth", 10);
     net->quantize_freezeBN_iterpoint = option_find_int_quiet(options, "quantize_freezeBN_iterpoint", 30000);
+
+    net->downsample_scale = option_find_int_quiet(options, "downsample_scale", 32);
 }
 
 int is_network(section *s)

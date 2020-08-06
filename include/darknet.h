@@ -209,6 +209,8 @@ struct layer{
     int *mask;
     int total;
 
+    int downsample_scale;
+
     // add for yolo layer
     float scale_xy;
 
