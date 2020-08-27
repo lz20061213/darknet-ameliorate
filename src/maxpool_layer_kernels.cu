@@ -24,8 +24,8 @@ __global__ void forward_maxpool_layer_kernel(int n, int in_h, int in_w, int in_c
     id /= c;
     int b = id;
 
-    int w_offset = -pad/2;
-    int h_offset = -pad/2;
+    int w_offset = -pad / 2;
+    int h_offset = -pad / 2;
 
     int out_index = j + w*(i + h*(k + c*b));
     float max = -INFINITY;
@@ -105,6 +105,16 @@ extern "C" void forward_maxpool_layer_gpu(maxpool_layer layer, network net)
     }
     printf("\n");
     */
+
+    if (net.write_results) {
+        cuda_pull_array(layer.output_gpu, layer.output, layer.batch*layer.outputs);
+        char buff[50];
+        sprintf(buff, "ship/outputs/maxpool_%02d.dat", layer.current_layer_index);
+        FILE *fp;
+        fp = fopen(buff, "wb");
+        fwrite(layer.output, sizeof(float), layer.batch*layer.outputs, fp);
+        fclose(fp);
+    }
 }
 
 extern "C" void backward_maxpool_layer_gpu(maxpool_layer layer, network net)

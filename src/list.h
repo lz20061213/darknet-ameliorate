@@ -7,7 +7,7 @@ int list_find(list *l, void *val);
 
 void list_insert(list *, void *);
 
-
 void free_list_contents(list *l);
+void free_list_contents_kvp(list *l);
 
 #endif

@@ -10,7 +10,7 @@
 #include <sys/time.h>
 
 #include "utils.h"
-
+#include "cost_layer.h"
 
 /*
 // old timing. is it better? who knows!!
@@ -213,6 +213,24 @@ void pm(int M, int N, float *A)
     printf("\n");
 }
 
+void trim(char *str)
+{
+    char* buffer = (char*)calloc(8192, sizeof(char));
+    sprintf(buffer, "%s", str);
+
+    char *p = buffer;
+    while (*p == ' ' || *p == '\t') ++p;
+
+    char *end = p + strlen(p) - 1;
+    while (*end == ' ' || *end == '\t') {
+        *end = '\0';
+        --end;
+    }
+    sprintf(str, "%s", p);
+
+    free(buffer);
+}
+
 void find_replace(char *str, char *orig, char *rep, char *output)
 {
     char buffer[4096] = {0};
@@ -227,6 +245,59 @@ void find_replace(char *str, char *orig, char *rep, char *output)
     *p = '\0';
 
     sprintf(output, "%s%s%s", buffer, rep, p+strlen(orig));
+}
+
+void replace_image_to_label(const char* input_path, char* output_path)
+{
+    find_replace(input_path, "/images/train2014/", "/labels/train2014/", output_path);    // COCO
+    find_replace(output_path, "/images/val2014/", "/labels/val2014/", output_path);        // COCO
+    find_replace(output_path, "/JPEGImages/", "/labels/", output_path);    // PascalVOC
+    // others
+    find_replace(output_path, "/ImageSets/", "/Annotations/", output_path);; // Ship-Comp
+    trim(output_path);
+
+    // replace only ext of files
+    find_replace_extension(output_path, ".jpg", ".txt", output_path);
+    find_replace_extension(output_path, ".JPG", ".txt", output_path); // error
+    find_replace_extension(output_path, ".jpeg", ".txt", output_path);
+    find_replace_extension(output_path, ".JPEG", ".txt", output_path);
+    find_replace_extension(output_path, ".png", ".txt", output_path);
+    find_replace_extension(output_path, ".PNG", ".txt", output_path);
+    find_replace_extension(output_path, ".bmp", ".txt", output_path);
+    find_replace_extension(output_path, ".BMP", ".txt", output_path);
+    find_replace_extension(output_path, ".ppm", ".txt", output_path);
+    find_replace_extension(output_path, ".PPM", ".txt", output_path);
+    find_replace_extension(output_path, ".tiff", ".txt", output_path);
+    find_replace_extension(output_path, ".TIFF", ".txt", output_path);
+
+    // Check file ends with txt:
+    if(strlen(output_path) > 4) {
+        char *output_path_ext = output_path + strlen(output_path) - 4;
+        if( strcmp(".txt", output_path_ext) != 0){
+            fprintf(stderr, "Failed to infer label file name (check image extension is supported): %s \n", output_path);
+        }
+    }else{
+        fprintf(stderr, "Label file name is too short: %s \n", output_path);
+    }
+}
+
+void find_replace_extension(char *str, char *orig, char *rep, char *output)
+{
+    char* buffer = (char*)calloc(8192, sizeof(char));
+
+    sprintf(buffer, "%s", str);
+    char *p = strstr(buffer, orig);
+    int offset = (p - buffer);
+    int chars_from_end = strlen(buffer) - offset;
+    if (!p || chars_from_end != strlen(orig)) {  // Is 'orig' even in 'str' AND is 'orig' found at the end of 'str'?
+        sprintf(output, "%s", buffer);
+        free(buffer);
+        return;
+    }
+
+    *p = '\0';
+    sprintf(output, "%s%s%s", buffer, rep, p + strlen(orig));
+    free(buffer);
 }
 
 float sec(clock_t clocks)
@@ -726,6 +797,105 @@ float **one_hot_encode(float *a, int n, int k)
 
 float two_way_max(float a, float b) {
     return (a > b) ? a : b;
+}
+
+void logicShift(float* data, int n, int bit) {
+    int i;
+    for (i=0; i<n; ++i) {
+        if (bit > 0) {
+            data[i] = (float)(((long long)data[i]) << bit);
+        } else {
+            data[i] = (float)(((long long)data[i]) >> (-bit));
+        }
+    }
+}
+
+void logicShiftAlign(float* data, int n, int bit) {
+    int i;
+    for (i=0; i<n; ++i) {
+        if (bit > 0) {
+            data[i] = (float)(((long long)data[i]) << bit);
+            if (data[i] < -128) data[i] = -128;
+            if (data[i] > 127) data[i] = 127;
+            data[i] = (int8_t)(data[i]);
+        } else {
+            data[i] = (float)(((long long)data[i]) >> (-bit));
+            if (data[i] < -128) data[i] = -128;
+            if (data[i] > 127) data[i] = 127;
+            data[i] = (int8_t)(data[i]);
+        }
+    }
+}
+
+void restore(float*data, int n, int bit) {
+    int i;
+    for (i=0; i<n; ++i) {
+        data[i] = data[i] / pow(2.0, bit);
+    }
+}
+
+void get_max_min(float *data, int n, float* max_data, float* min_data) {
+    float *copydata;
+    copydata = calloc(n, sizeof(float));
+    copy_cpu(n, data, 1, copydata, 1);
+    qsort(copydata, n, sizeof(float), float_compare);
+    *max_data = copydata[n-1];
+    *min_data = copydata[0];
+    free(copydata);
+}
+
+int quantizeOutputs(float* output, int n) {
+    int i, fl = 0;
+    float max_fl = 0.0;
+    float log2 = log(2);
+    float max_output, min_output, QMINNUM, QMAXNUM;
+    get_max_min(output, n, &max_output, &min_output);
+    //printf("max, min: %f, %f\n", max_output, min_output);
+    QMINNUM = -pow(2.0, BITWIDTH-1);
+    QMAXNUM = pow(2.0, BITWIDTH-1) - 1;
+    if (min_output == 0) {
+        if (max_output == 0) {
+            max_fl = 0.0;
+        } else if (max_output > 0) {
+            max_fl = log(QMAXNUM / max_output) / log2;
+        }
+    } else if (min_output < 0) {
+        if (max_output < 0) {
+            float fl1 = log(QMINNUM / min_output) / log2;
+            float fl2 = log(QMINNUM / max_output) / log2;
+            if (fl1 < fl2) {
+                max_fl = fl1;
+            } else {
+                max_fl = fl2;
+            }
+        } else if (max_output == 0) {
+            max_fl = log(QMINNUM / min_output) / log2;
+        } else {
+            float fl1 = log(QMINNUM / min_output) / log2;
+            float fl2 = log(QMAXNUM / max_output) / log2;
+            if (fl1 < fl2) {
+                max_fl = fl1;
+            } else {
+                max_fl = fl2;
+            }
+        }
+    } else {
+        float fl1 = log(QMAXNUM / min_output) / log2;
+        float fl2 = log(QMAXNUM / max_output) / log2;
+        if (fl1 < fl2) {
+            max_fl = fl1;
+        } else {
+            max_fl = fl2;
+        }
+    }
+    fl = (int)floorf(max_fl);
+    // quantize
+    for(i=0; i<n; ++i) {
+        output[i] = (float) ((long long) (output[i] * pow(2.0, fl)));
+        //output[i] = output[i] > QMINNUM ? output[i] : QMINNUM;
+        //output[i] = output[i] < QMAXNUM ? output[i] : QMAXNUM;
+    }
+    return fl;
 }
 
 void quantize(float *x, int n, int total_bitwidth, int fraction_bitwidth)

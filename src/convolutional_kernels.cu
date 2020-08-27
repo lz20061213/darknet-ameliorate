@@ -11,6 +11,7 @@ extern "C" {
 #include "col2im.h"
 #include "utils.h"
 #include "cuda.h"
+#include "cost_layer.h"
 }
 
 __global__ void binarize_kernel(float *x, int n, float *binary)
@@ -86,18 +87,199 @@ void forward_convolutional_layer_gpu(convolutional_layer l, network net)
     }
 
     if(l.quantize){
-        // quantize the input feature maps
-        copy_gpu(l.inputs*l.batch, net.input_gpu, 1, l.quantize_input_gpu, 1);
-        if (l.quantize_feature) {
-            quantize_gpu(l.quantize_input_gpu, l.inputs*l.batch, net.quantize_feature_bitwidth, net.quantize_feature_fraction_bitwidth);
+        if (l.quantization_aware_training) {
+            // quantize the input feature maps
+            copy_gpu(l.inputs*l.batch, net.input_gpu, 1, l.quantize_input_gpu, 1);
+            if (l.quantize_feature) {
+                quantize_gpu(l.quantize_input_gpu, l.inputs*l.batch, l.quantize_feature_bitwidth, l.quantize_feature_fraction_bitwidth);
+            }
+            if(l.batch_normalize) {
+    #ifdef CUDNN
+                float one = 1;
+                cudnnConvolutionForward(cudnn_handle(),
+                            &one,
+                            l.srcTensorDesc,
+                            l.quantize_input_gpu,
+                            l.weightDesc,
+                            l.weights_gpu,
+                            l.convDesc,
+                            l.fw_algo,
+                            net.workspace,
+                            l.workspace_size,
+                            &one,
+                            l.dstTensorDesc,
+                            l.output_gpu);
+    #else
+                int i, j;
+                int m = l.n/l.groups;
+                int k = l.size*l.size*l.c/l.groups;
+                int n = l.out_w*l.out_h;
+                for(i = 0; i < l.batch; ++i){
+                    for(j = 0; j < l.groups; ++j){
+                        float *a = l.weights_gpu + j*l.nweights/l.groups;
+                        float *b = net.workspace;
+                        float *c = l.output_gpu + (i*l.groups + j)*n*m;
+                        float *im = l.quantize_input_gpu + (i*l.groups + j)*l.c/l.groups*l.h*l.w;
+
+                        if (l.size == 1){
+                            b = im;
+                        } else {
+                            im2col_gpu_ext(im,          // input
+                                l.c / l.groups,         // input channels
+                                l.h, l.w,               // input size (h, w)
+                                l.size, l.size,         // kernel size (h, w)
+                                l.pad, l.pad,           // padding (h, w)
+                                l.stride, l.stride,     // stride (h, w)
+                                l.dilation, l.dilation, // dilation (h, w)
+                                b);       // output
+                        }
+                        gemm_gpu(0,0,m,n,k,1,a,k,b,n,1,c,n);
+                    }
+                }
+    #endif
+                // copy x_stat, used for backward
+                copy_gpu(l.batch*l.outputs, l.output_gpu, 1, l.x_stat_gpu, 1);
+
+                // calculate the mean and variance of l.output_gpu
+                fast_mean_gpu(l.output_gpu, l.batch, l.out_c, l.out_h*l.out_w, l.mean_gpu);
+                fast_variance_gpu(l.output_gpu, l.mean_gpu, l.batch, l.out_c, l.out_h*l.out_w, l.variance_gpu);
+
+                copy_gpu(l.nweights, l.weights_gpu, 1, l.merge_weights_gpu, 1);
+                scale_weights_gpu(l.merge_weights_gpu, l.nweights, l.n, l.scales_gpu, l.rolling_variance_gpu);
+
+                copy_gpu(l.nweights, l.merge_weights_gpu, 1, l.scale_weights_gpu, 1);
+                quantize_gpu(l.merge_weights_gpu, l.nweights, l.quantize_weight_bitwidth, l.quantize_weight_fraction_bitwidth);
+
+    #ifdef CUDNN
+                // free the results of output_gpu in first conv, or use zero in cudnnConvolutionForward
+                fill_gpu(l.batch*l.outputs, 0, l.output_gpu, 1);
+                one = 1;
+                cudnnConvolutionForward(cudnn_handle(),
+                            &one,
+                            l.srcTensorDesc,
+                            l.quantize_input_gpu,
+                            l.weightDesc,
+                            l.merge_weights_gpu,
+                            l.convDesc,
+                            l.fw_algo,
+                            net.workspace,
+                            l.workspace_size,
+                            &one,
+                            l.dstTensorDesc,
+                            l.output_gpu);
+    #else
+                int i, j;
+                int m = l.n/l.groups;
+                int k = l.size*l.size*l.c/l.groups;
+                int n = l.out_w*l.out_h;
+                for(i = 0; i < l.batch; ++i){
+                    for(j = 0; j < l.groups; ++j){
+                        float *a = l.merge_weights_gpu + j*l.nweights/l.groups;
+                        float *b = net.workspace;
+                        float *c = l.output_gpu + (i*l.groups + j)*n*m;
+                        float *im = l.quantize_input_gpu + (i*l.groups + j)*l.c/l.groups*l.h*l.w;
+
+                        if (l.size == 1){
+                            b = im;
+                        } else {
+                            im2col_gpu_ext(im,          // input
+                                l.c / l.groups,         // input channels
+                                l.h, l.w,               // input size (h, w)
+                                l.size, l.size,         // kernel size (h, w)
+                                l.pad, l.pad,           // padding (h, w)
+                                l.stride, l.stride,     // stride (h, w)
+                                l.dilation, l.dilation, // dilation (h, w)
+                                b);       // output
+                        }
+                        gemm_gpu(0,0,m,n,k,1,a,k,b,n,1,c,n);
+                    }
+                }
+    #endif
+
+                copy_gpu(l.n, l.biases_gpu, 1, l.merge_biases_gpu, 1);
+                // update the rolling_mean_gpu and rolling_variance_gpu
+                if (!net.quantize_freezeBN) {
+                    // todo: keep outputs before scal, used in backward
+                    copy_gpu(l.batch*l.outputs, l.output_gpu, 1, l.x_norm_gpu, 1);
+
+                    scale_outputs_gpu(l.output_gpu, l.variance_gpu, l.rolling_variance_gpu, l.batch, l.out_c, l.out_w*l.out_h);
+
+                    shift_bias_gpu(l.merge_biases_gpu, l.n, l.scales_gpu, l.biases_gpu, l.mean_gpu, l.variance_gpu);
+
+                    // todo: keep rolling_variance before scal, used in backward
+                    //scal_gpu(l.out_c, .99, l.rolling_mean_gpu, 1);
+                    //axpy_gpu(l.out_c, .01, l.mean_gpu, 1, l.rolling_mean_gpu, 1);
+                    //scal_gpu(l.out_c, .99, l.rolling_variance_gpu, 1);
+                    //axpy_gpu(l.out_c, .01, l.variance_gpu, 1, l.rolling_variance_gpu, 1);
+                } else {
+                    shift_bias_gpu(l.merge_biases_gpu, l.n, l.scales_gpu, l.biases_gpu, l.rolling_mean_gpu, l.rolling_variance_gpu);
+                }
+
+                copy_gpu(l.n, l.merge_biases_gpu, 1, l.shift_biases_gpu, 1);
+                quantize_gpu(l.merge_biases_gpu, l.n, l.quantize_bias_bitwidth, l.quantize_bias_fraction_bitwidth); // todo
+                add_bias_gpu(l.output_gpu, l.merge_biases_gpu, l.batch, l.out_c, l.out_w*l.out_h);
+            } else {
+                copy_gpu(l.nweights, l.weights_gpu, 1, l.merge_weights_gpu, 1);
+                quantize_gpu(l.merge_weights_gpu, l.nweights, l.quantize_weight_bitwidth, l.quantize_weight_fraction_bitwidth);
+    #ifdef CUDNN
+                float one = 1;
+                cudnnConvolutionForward(cudnn_handle(),
+                            &one,
+                            l.srcTensorDesc,
+                            l.quantize_input_gpu,
+                            l.weightDesc,
+                            l.merge_weights_gpu,
+                            l.convDesc,
+                            l.fw_algo,
+                            net.workspace,
+                            l.workspace_size,
+                            &one,
+                            l.dstTensorDesc,
+                            l.output_gpu);
+    #else
+                int i, j;
+                int m = l.n/l.groups;
+                int k = l.size*l.size*l.c/l.groups;
+                int n = l.out_w*l.out_h;
+                for(i = 0; i < l.batch; ++i){
+                    for(j = 0; j < l.groups; ++j){
+                        float *a = l.merge_weights_gpu + j*l.nweights/l.groups;
+                        float *b = net.workspace;
+                        float *c = l.output_gpu + (i*l.groups + j)*n*m;
+                        float *im = l.quantize_input_gpu + (i*l.groups + j)*l.c/l.groups*l.h*l.w;
+
+                        if (l.size == 1){
+                            b = im;
+                        } else {
+                            im2col_gpu_ext(im,          // input
+                                l.c / l.groups,         // input channels
+                                l.h, l.w,               // input size (h, w)
+                                l.size, l.size,         // kernel size (h, w)
+                                l.pad, l.pad,           // padding (h, w)
+                                l.stride, l.stride,     // stride (h, w)
+                                l.dilation, l.dilation, // dilation (h, w)
+                                b);       // output
+                        }
+                        gemm_gpu(0,0,m,n,k,1,a,k,b,n,1,c,n);
+                    }
+                }
+    #endif
+                copy_gpu(l.n, l.biases_gpu, 1, l.merge_biases_gpu, 1);
+                quantize_gpu(l.merge_biases_gpu, l.n, l.quantize_bias_bitwidth, l.quantize_bias_fraction_bitwidth);
+                add_bias_gpu(l.output_gpu, l.merge_biases_gpu, l.batch, l.n, l.out_w*l.out_h);
+            }
         }
-        if(l.batch_normalize) {
-#ifdef CUDNN
+        else
+        {
+            //cuda_pull_array(net.input_gpu, net.input, l.batch*l.inputs);
+            //printf("input: %f %f %f %f %f\n", net.input[0], net.input[1], net.input[2], net.input[3], net.input[4]);
+
+            //printf("1. net.fl: %d, l.conv_fl: %d, l.bias_fl: %d\n", *(net.fl), *(l.conv_fl), *(l.bias_fl));
             float one = 1;
             cudnnConvolutionForward(cudnn_handle(),
                         &one,
                         l.srcTensorDesc,
-                        l.quantize_input_gpu,
+                        net.input_gpu,
                         l.weightDesc,
                         l.weights_gpu,
                         l.convDesc,
@@ -107,166 +289,40 @@ void forward_convolutional_layer_gpu(convolutional_layer l, network net)
                         &one,
                         l.dstTensorDesc,
                         l.output_gpu);
-#else
-            int i, j;
-            int m = l.n/l.groups;
-            int k = l.size*l.size*l.c/l.groups;
-            int n = l.out_w*l.out_h;
-            for(i = 0; i < l.batch; ++i){
-                for(j = 0; j < l.groups; ++j){
-                    float *a = l.weights_gpu + j*l.nweights/l.groups;
-                    float *b = net.workspace;
-                    float *c = l.output_gpu + (i*l.groups + j)*n*m;
-                    float *im = l.quantize_input_gpu + (i*l.groups + j)*l.c/l.groups*l.h*l.w;
 
-                    if (l.size == 1){
-                        b = im;
-                    } else {
-                        im2col_gpu_ext(im,          // input
-                            l.c / l.groups,         // input channels
-                            l.h, l.w,               // input size (h, w)
-                            l.size, l.size,         // kernel size (h, w)
-                            l.pad, l.pad,           // padding (h, w)
-                            l.stride, l.stride,     // stride (h, w)
-                            l.dilation, l.dilation, // dilation (h, w)
-                            b);       // output
-                    }
-                    gemm_gpu(0,0,m,n,k,1,a,k,b,n,1,c,n);
-                }
-            }
-#endif
-            // copy x_stat, used for backward
-            copy_gpu(l.batch*l.outputs, l.output_gpu, 1, l.x_stat_gpu, 1);
+            *(net.fl) += *(l.conv_fl);
+            //cuda_pull_array(l.output_gpu, l.output, l.batch*l.outputs);
+            //printf("after conv output: %f %f %f %f %f\n", l.output[0], l.output[1], l.output[2], l.output[3], l.output[4]);
 
-            // calculate the mean and variance of l.output_gpu
-            fast_mean_gpu(l.output_gpu, l.batch, l.out_c, l.out_h*l.out_w, l.mean_gpu);
-            fast_variance_gpu(l.output_gpu, l.mean_gpu, l.batch, l.out_c, l.out_h*l.out_w, l.variance_gpu);
+            //printf("2. net.fl: %d, l.conv_fl: %d, l.bias_fl: %d\n", *(net.fl), *(l.conv_fl), *(l.bias_fl));
 
-            copy_gpu(l.nweights, l.weights_gpu, 1, l.merge_weights_gpu, 1);
-            scale_weights_gpu(l.merge_weights_gpu, l.nweights, l.n, l.scales_gpu, l.rolling_variance_gpu);
-
-            copy_gpu(l.nweights, l.merge_weights_gpu, 1, l.scale_weights_gpu, 1);
-            quantize_gpu(l.merge_weights_gpu, l.nweights, net.quantize_weight_bitwidth, net.quantize_weight_fraction_bitwidth);
-
-#ifdef CUDNN
-            // free the results of output_gpu in first conv, or use zero in cudnnConvolutionForward
-            fill_gpu(l.batch*l.outputs, 0, l.output_gpu, 1);
-            one = 1;
-            cudnnConvolutionForward(cudnn_handle(),
-                        &one,
-                        l.srcTensorDesc,
-                        l.quantize_input_gpu,
-                        l.weightDesc,
-                        l.merge_weights_gpu,
-                        l.convDesc,
-                        l.fw_algo,
-                        net.workspace,
-                        l.workspace_size,
-                        &one,
-                        l.dstTensorDesc,
-                        l.output_gpu);
-#else
-            int i, j;
-            int m = l.n/l.groups;
-            int k = l.size*l.size*l.c/l.groups;
-            int n = l.out_w*l.out_h;
-            for(i = 0; i < l.batch; ++i){
-                for(j = 0; j < l.groups; ++j){
-                    float *a = l.merge_weights_gpu + j*l.nweights/l.groups;
-                    float *b = net.workspace;
-                    float *c = l.output_gpu + (i*l.groups + j)*n*m;
-                    float *im = l.quantize_input_gpu + (i*l.groups + j)*l.c/l.groups*l.h*l.w;
-
-                    if (l.size == 1){
-                        b = im;
-                    } else {
-                        im2col_gpu_ext(im,          // input
-                            l.c / l.groups,         // input channels
-                            l.h, l.w,               // input size (h, w)
-                            l.size, l.size,         // kernel size (h, w)
-                            l.pad, l.pad,           // padding (h, w)
-                            l.stride, l.stride,     // stride (h, w)
-                            l.dilation, l.dilation, // dilation (h, w)
-                            b);       // output
-                    }
-                    gemm_gpu(0,0,m,n,k,1,a,k,b,n,1,c,n);
-                }
-            }
-#endif
-
-            copy_gpu(l.n, l.biases_gpu, 1, l.merge_biases_gpu, 1);
-            // update the rolling_mean_gpu and rolling_variance_gpu
-            if (!net.quantize_freezeBN) {
-                // todo: keep outputs before scal, used in backward
-                copy_gpu(l.batch*l.outputs, l.output_gpu, 1, l.x_norm_gpu, 1);
-
-                scale_outputs_gpu(l.output_gpu, l.variance_gpu, l.rolling_variance_gpu, l.batch, l.out_c, l.out_w*l.out_h);
-
-                shift_bias_gpu(l.merge_biases_gpu, l.n, l.scales_gpu, l.biases_gpu, l.mean_gpu, l.variance_gpu);
-
-                // todo: keep rolling_variance before scal, used in backward
-                //scal_gpu(l.out_c, .99, l.rolling_mean_gpu, 1);
-                //axpy_gpu(l.out_c, .01, l.mean_gpu, 1, l.rolling_mean_gpu, 1);
-                //scal_gpu(l.out_c, .99, l.rolling_variance_gpu, 1);
-                //axpy_gpu(l.out_c, .01, l.variance_gpu, 1, l.rolling_variance_gpu, 1);
-            } else {
-                shift_bias_gpu(l.merge_biases_gpu, l.n, l.scales_gpu, l.biases_gpu, l.rolling_mean_gpu, l.rolling_variance_gpu);
+            if (!net.convx_bias_align) {
+                // quantize: shift output to bias, and add bias, update net.fl
+                int diff = *(l.bias_fl) - *(net.fl);
+                //printf("3. diff %d\n", diff);
+                cuda_pull_array(l.output_gpu, l.output, l.batch*l.outputs);
+                //printf("3.5\n");
+                logicShift(l.output, l.batch*l.outputs, diff);
+                cuda_push_array(l.output_gpu, l.output, l.batch*l.outputs);
+                *(net.fl) = *(l.bias_fl);
             }
 
-            copy_gpu(l.n, l.merge_biases_gpu, 1, l.shift_biases_gpu, 1);
-            quantize_gpu(l.merge_biases_gpu, l.n, net.quantize_bias_bitwidth, net.quantize_bias_fraction_bitwidth); // todo
-            add_bias_gpu(l.output_gpu, l.merge_biases_gpu, l.batch, l.out_c, l.out_w*l.out_h);
-        } else {
-            copy_gpu(l.nweights, l.weights_gpu, 1, l.merge_weights_gpu, 1);
-            quantize_gpu(l.merge_weights_gpu, l.nweights, net.quantize_weight_bitwidth, net.quantize_weight_fraction_bitwidth);
-#ifdef CUDNN
-            float one = 1;
-            cudnnConvolutionForward(cudnn_handle(),
-                        &one,
-                        l.srcTensorDesc,
-                        l.quantize_input_gpu,
-                        l.weightDesc,
-                        l.merge_weights_gpu,
-                        l.convDesc,
-                        l.fw_algo,
-                        net.workspace,
-                        l.workspace_size,
-                        &one,
-                        l.dstTensorDesc,
-                        l.output_gpu);
-#else
-            int i, j;
-            int m = l.n/l.groups;
-            int k = l.size*l.size*l.c/l.groups;
-            int n = l.out_w*l.out_h;
-            for(i = 0; i < l.batch; ++i){
-                for(j = 0; j < l.groups; ++j){
-                    float *a = l.merge_weights_gpu + j*l.nweights/l.groups;
-                    float *b = net.workspace;
-                    float *c = l.output_gpu + (i*l.groups + j)*n*m;
-                    float *im = l.quantize_input_gpu + (i*l.groups + j)*l.c/l.groups*l.h*l.w;
+            //printf("4. net.fl: %d, l.conv_fl: %d, l.bias_fl: %d\n", *(net.fl), *(l.conv_fl), *(l.bias_fl));
 
-                    if (l.size == 1){
-                        b = im;
-                    } else {
-                        im2col_gpu_ext(im,          // input
-                            l.c / l.groups,         // input channels
-                            l.h, l.w,               // input size (h, w)
-                            l.size, l.size,         // kernel size (h, w)
-                            l.pad, l.pad,           // padding (h, w)
-                            l.stride, l.stride,     // stride (h, w)
-                            l.dilation, l.dilation, // dilation (h, w)
-                            b);       // output
-                    }
-                    gemm_gpu(0,0,m,n,k,1,a,k,b,n,1,c,n);
-                }
-            }
-#endif
-            copy_gpu(l.n, l.biases_gpu, 1, l.merge_biases_gpu, 1);
-            quantize_gpu(l.merge_biases_gpu, l.n, net.quantize_bias_bitwidth, net.quantize_bias_fraction_bitwidth);
-            add_bias_gpu(l.output_gpu, l.merge_biases_gpu, l.batch, l.n, l.out_w*l.out_h);
+            add_bias_gpu(l.output_gpu, l.biases_gpu, l.batch, l.n, l.out_w*l.out_h);
+
+            //cuda_pull_array(l.output_gpu, l.output, l.batch*l.outputs);
+            //printf("add bias output: %f %f %f %f %f\n", l.output[0], l.output[1], l.output[2], l.output[3], l.output[4]);
         }
-    } else {
+    }
+    else
+    {
+        if (net.write_statistic_features) {
+            // quantize: statistic the feature maps, for statistic feature_fraction_bitwidth
+            cuda_pull_array(net.input_gpu, net.input, l.inputs*l.batch);
+            qsort(net.input, l.batch*l.inputs, sizeof(float), float_compare);
+            fprintf(net.filewriter_features, "convolution %d input, min: %.4f, max: %.4f\n", l.current_layer_index, net.input[0], net.input[l.inputs*l.batch-1]);
+        }
 #ifdef CUDNN
         float one = 1;
         cudnnConvolutionForward(cudnn_handle(),
@@ -320,7 +376,52 @@ void forward_convolutional_layer_gpu(convolutional_layer l, network net)
     if (l.activation == SWISH)
         copy_gpu(l.batch*l.outputs, l.output_gpu, 1, l.output_afterbn_gpu, 1);
 
-    activate_array_gpu(l.output_gpu, l.outputs*l.batch, l.activation);
+    activate_array_gpu(l.output_gpu, l.outputs*l.batch, l.activation, l.leaky_rate);
+
+    //cuda_pull_array(l.output_gpu, l.output, l.batch*l.outputs);
+    //printf("leaky output: %f %f %f %f %f\n", l.output[0], l.output[1], l.output[2], l.output[3], l.output[4]);
+
+    if(l.post_training_quantization) {
+        if (l.activation != LINEAR) {
+            cuda_pull_array(l.output_gpu, l.output, l.batch*l.outputs);
+            if (!net.convx_bias_align) {
+                int x_fl = quantizeOutputs(l.output, l.batch*l.outputs);
+                *(net.fl) += x_fl;
+            }
+            else {
+                int diff = *(net.fl) - *(l.x_fl);
+                //printf("convolution %d diff: %d\n", state.index, diff);
+                logicShiftAlign(l.output, l.batch*l.outputs, -diff);
+                *(net.fl) = *(l.x_fl);
+            }
+            cuda_push_array(l.output_gpu, l.output, l.batch*l.outputs);
+        }
+
+        //printf("5. net.fl: %d, l.conv_fl: %d, l.bias_fl: %d\n", *(net.fl), *(l.conv_fl), *(l.bias_fl));
+        //cuda_pull_array(l.output_gpu, l.output, l.batch*l.outputs);
+        //printf("final output: %f %f %f %f %f\n", l.output[0], l.output[1], l.output[2], l.output[3], l.output[4]);
+
+        *(l.x_fl) = *(net.fl);
+
+
+        if (net.write_results) {
+            if(l.activation == LINEAR) cuda_pull_array(l.output_gpu, l.output, l.batch*l.outputs);
+            char buff[50];
+            sprintf(buff, "ship/outputs/convolution_%02d.dat", l.current_layer_index);
+            FILE *fp;
+            fp = fopen(buff, "wb");
+            fwrite(l.output, sizeof(float), l.batch*l.outputs, fp);
+            fclose(fp);
+        }
+
+        if (net.write_statistic_fl) {
+            char buff[20];
+            sprintf(buff, "convolution %d: %d\n", l.current_layer_index, *(l.x_fl));
+            //printf("%s", buff);
+            fwrite(buff, sizeof(char), strlen(buff), net.filewriter_fl);
+        }
+
+    }
 
     //if(l.dot > 0) dot_error_gpu(l);
     if(l.binary || l.xnor) swap_binary(&l);
@@ -375,9 +476,9 @@ void backward_convolutional_layer_gpu(convolutional_layer l, network net)
     }
     //constrain_gpu(l.outputs*l.batch, 1, l.delta_gpu, 1);
     if (l.activation == SWISH) {
-        gradient_array_gpu(l.output_afterbn_gpu, l.outputs*l.batch, l.activation, l.delta_gpu);
+        gradient_array_gpu(l.output_afterbn_gpu, l.outputs*l.batch, l.activation, l.delta_gpu, 0);
     } else {
-        gradient_array_gpu(l.output_gpu, l.outputs*l.batch, l.activation, l.delta_gpu);
+        gradient_array_gpu(l.output_gpu, l.outputs*l.batch, l.activation, l.delta_gpu, l.leaky_rate);
     }
 
     // CHECK since the gradient accumulate each backward, so there need to use temp updates
@@ -389,7 +490,7 @@ void backward_convolutional_layer_gpu(convolutional_layer l, network net)
             // CHECK backward y = conv(x) + merge_bias, for merge_bias
             backward_bias_gpu(l.bias_updates_gpu_part, l.delta_gpu, l.batch, l.n, l.out_w*l.out_h);
             // CHECK backward merge_bias = quantize_gpu(shift_bias)
-            backward_quantize_gpu(l.bias_updates_gpu_part, l.shift_biases_gpu, l.n, net.quantize_bias_bitwidth, net.quantize_bias_fraction_bitwidth);
+            backward_quantize_gpu(l.bias_updates_gpu_part, l.shift_biases_gpu, l.n, l.quantize_bias_bitwidth, l.quantize_bias_fraction_bitwidth);
             // CHECK backward shift_bias = bias - gamma * mean / sqrt(var+.00001f), bias_updates_gpu unchanged
             axpy_gpu(l.n, 1, l.bias_updates_gpu_part, 1, l.bias_updates_gpu, 1);
 
@@ -423,7 +524,7 @@ void backward_convolutional_layer_gpu(convolutional_layer l, network net)
 #endif
 
             // CHECK backward merge_weights = quantize_gpu(scale_weights)
-            backward_quantize_gpu(l.weight_updates_gpu_part, l.scale_weights_gpu, l.nweights, net.quantize_weight_bitwidth, net.quantize_weight_fraction_bitwidth);
+            backward_quantize_gpu(l.weight_updates_gpu_part, l.scale_weights_gpu, l.nweights, l.quantize_weight_bitwidth, l.quantize_weight_fraction_bitwidth);
 
             // CHECK backward scale_weights = gamma / sqrt(var+.00001f) * weights, gamma first, then update weights
             fill_gpu(l.n, 0, l.scale_updates_gpu_part, 1);
@@ -493,7 +594,7 @@ void backward_convolutional_layer_gpu(convolutional_layer l, network net)
             // CHECK backward y = conv(x) + merge_bias, for merge_bias
             backward_bias_gpu(l.bias_updates_gpu_part, l.delta_gpu, l.batch, l.n, l.out_w*l.out_h);
             // CHECK backward merge_bias = quantize_gpu(bias)
-            backward_quantize_gpu(l.bias_updates_gpu_part, l.biases_gpu, l.n, net.quantize_bias_bitwidth, net.quantize_bias_fraction_bitwidth);
+            backward_quantize_gpu(l.bias_updates_gpu_part, l.biases_gpu, l.n, l.quantize_bias_bitwidth, l.quantize_bias_fraction_bitwidth);
             axpy_gpu(l.n, 1, l.bias_updates_gpu_part, 1, l.bias_updates_gpu, 1);
 
             // CHECK backward y = conv(x) + merge_bias, for conv (w)
@@ -511,7 +612,7 @@ void backward_convolutional_layer_gpu(convolutional_layer l, network net)
                     l.dweightDesc,
                     l.weight_updates_gpu_part);
             // CHECK bacward merge_weights = quantize_gpu(weights)
-            backward_quantize_gpu(l.weight_updates_gpu_part, l.weights_gpu, l.nweights, net.quantize_weight_bitwidth, net.quantize_weight_fraction_bitwidth);
+            backward_quantize_gpu(l.weight_updates_gpu_part, l.weights_gpu, l.nweights, l.quantize_weight_bitwidth, l.quantize_weight_fraction_bitwidth);
             axpy_gpu(l.nweights, 1, l.weight_updates_gpu_part, 1, l.weight_updates_gpu, 1);
         }
 
@@ -534,16 +635,18 @@ void backward_convolutional_layer_gpu(convolutional_layer l, network net)
 #endif
             if (l.quantize_feature) {
                 // CHECK backward net.quantize_input_gpu = quantize(net.input_gpu)
-                backward_quantize_gpu(net.delta_gpu, net.input_gpu, l.batch * l.inputs, net.quantize_feature_bitwidth, net.quantize_feature_fraction_bitwidth);
+                backward_quantize_gpu(net.delta_gpu, net.input_gpu, l.batch * l.inputs, l.quantize_feature_bitwidth, l.quantize_feature_fraction_bitwidth);
             }
         }
 
         if (l.batch_normalize) {
-            // update rolling_mean_gpu and rolling_variance_gpu after backward
-            scal_gpu(l.out_c, .99, l.rolling_mean_gpu, 1);
-            axpy_gpu(l.out_c, .01, l.mean_gpu, 1, l.rolling_mean_gpu, 1);
-            scal_gpu(l.out_c, .99, l.rolling_variance_gpu, 1);
-            axpy_gpu(l.out_c, .01, l.variance_gpu, 1, l.rolling_variance_gpu, 1);
+            if (!net.quantize_freezeBN) {
+                // update rolling_mean_gpu and rolling_variance_gpu after backward
+                scal_gpu(l.out_c, .99, l.rolling_mean_gpu, 1);
+                axpy_gpu(l.out_c, .01, l.mean_gpu, 1, l.rolling_mean_gpu, 1);
+                scal_gpu(l.out_c, .99, l.rolling_variance_gpu, 1);
+                axpy_gpu(l.out_c, .01, l.variance_gpu, 1, l.rolling_variance_gpu, 1);
+            }
         }
     }
     else {
@@ -586,7 +689,7 @@ void backward_convolutional_layer_gpu(convolutional_layer l, network net)
                     l.dsrcTensorDesc,
                     net.delta_gpu);
             if(l.binary || l.xnor) swap_binary(&l);
-            if(l.xnor) gradient_array_gpu(original_input, l.batch*l.c*l.h*l.w, HARDTAN, net.delta_gpu);
+            if(l.xnor) gradient_array_gpu(original_input, l.batch*l.c*l.h*l.w, HARDTAN, net.delta_gpu, 0);
         }
 #else
         int m = l.n/l.groups;
@@ -639,7 +742,7 @@ void backward_convolutional_layer_gpu(convolutional_layer l, network net)
                         swap_binary(&l);
                     }
                 }
-                if(l.xnor) gradient_array_gpu(original_input + i*l.c*l.h*l.w, l.c*l.h*l.w, HARDTAN, net.delta_gpu + i*l.c*l.h*l.w);
+                if(l.xnor) gradient_array_gpu(original_input + i*l.c*l.h*l.w, l.c*l.h*l.w, HARDTAN, net.delta_gpu + i*l.c*l.h*l.w, 0);
             }
         }
 #endif

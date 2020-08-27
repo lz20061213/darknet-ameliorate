@@ -526,9 +526,10 @@ float train_network(network *net, data d)
 
     int i;
 
-    if (net->quantize) {
+    if (net->transfer_input) {
         for (i = 0; i < d.X.rows; ++i) {
-            scal_cpu(d.X.cols, 255.0, d.X.vals[i], 1);
+            scal_cpu_int(d.X.cols, 255.0, d.X.vals[i], 1);
+            add_cpu(d.X.cols, -128, d.X.vals[i], 1);
         }
     }
 
@@ -784,6 +785,30 @@ float *network_predict(network *net, float *input)
     net->truth = 0;
     net->train = 0;
     net->delta = 0;
+
+    int size = net->h*net->w*net->c;
+
+    if (net->transfer_input) {
+        scal_cpu_int(size, 255.0, net->input, 1);
+        add_cpu(size, -128, net->input, 1);
+    }
+
+    // write input to input.dat
+    if (net->write_input) {
+        printf("input size: %d\n", size);
+        FILE *fp;
+        fp = fopen("ship/input.dat", "wb");
+        fwrite(net->input, sizeof(float), size, fp);
+        fclose(fp);
+    }
+
+    fuse_conv_batchnorm(net);
+
+    if (net->post_training_quantization) {
+        net->fl = calloc(1, sizeof(int));
+        *(net->fl) = 0;
+    }
+
     forward_network(net);
     float *out = net->output;
     *net = orig;
@@ -1074,6 +1099,7 @@ void forward_network_gpu(network *netp)
     for(i = 0; i < net.n; ++i){
         net.index = i;
         layer l = net.layers[i];
+        l.current_layer_index = i;
         if(l.delta_gpu){
             fill_gpu(l.outputs * l.batch, 0, l.delta_gpu, 1);
         }

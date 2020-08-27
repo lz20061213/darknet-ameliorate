@@ -762,6 +762,15 @@ char **get_labels(char *filename)
     return labels;
 }
 
+char **get_labels_custom(char *filename, int *size)
+{
+    list *plist = get_paths(filename);
+    if(size) *size = plist->size;
+    char **labels = (char **)list_to_array(plist);
+    free_list(plist);
+    return labels;
+}
+
 void free_data(data d)
 {
     if(!d.shallow){
@@ -1277,7 +1286,7 @@ data load_data_detection(int n, char **paths, int m, int w, int h, int boxes, in
                     // [0 ~ cut_x, cut_y ~ h]
                     // [cut_x ~ w, cut_y ~ h]
 
-                    image fusion_image = make_image(h, w, 3);
+                    image fusion_image = make_image(w, h, 3);
                     float *fusion_label = calloc(5*boxes, sizeof(float));
                     int fusion_count = 0;
 
@@ -1378,7 +1387,7 @@ data load_data_detection(int n, char **paths, int m, int w, int h, int boxes, in
                     //printf("after memcpy fusion_label\n");
 
                     // check the ground truth
-
+                    /*
                     show_image(fusion_image, "fusion_image", 0);
                     rgbgr_image(fusion_image);
                     IplImage* fimg = image_to_ipl(fusion_image);
@@ -1396,8 +1405,7 @@ data load_data_detection(int n, char **paths, int m, int w, int h, int boxes, in
                     }
                     cvShowImage("fimg", fimg);
                     cvWaitKey(0);
-
-
+                    */
                     free(fusion_label);
                     free(random_fusion_paths);
 

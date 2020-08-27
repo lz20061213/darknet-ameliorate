@@ -266,8 +266,8 @@ void forward_gru_layer_gpu(layer l, network net)
         copy_gpu(l.outputs*l.batch, ur.output_gpu, 1, l.r_gpu, 1);
         axpy_gpu(l.outputs*l.batch, 1, wr.output_gpu, 1, l.r_gpu, 1);
 
-        activate_array_gpu(l.z_gpu, l.outputs*l.batch, LOGISTIC);
-        activate_array_gpu(l.r_gpu, l.outputs*l.batch, LOGISTIC);
+        activate_array_gpu(l.z_gpu, l.outputs*l.batch, LOGISTIC, 0);
+        activate_array_gpu(l.r_gpu, l.outputs*l.batch, LOGISTIC, 0);
 
         copy_gpu(l.outputs*l.batch, l.state_gpu, 1, l.forgot_state_gpu, 1);
         mul_gpu(l.outputs*l.batch, l.r_gpu, 1, l.forgot_state_gpu, 1);
@@ -279,9 +279,9 @@ void forward_gru_layer_gpu(layer l, network net)
         axpy_gpu(l.outputs*l.batch, 1, wh.output_gpu, 1, l.h_gpu, 1);
 
         if(l.tanh){
-            activate_array_gpu(l.h_gpu, l.outputs*l.batch, TANH);
+            activate_array_gpu(l.h_gpu, l.outputs*l.batch, TANH, 0);
         } else {
-            activate_array_gpu(l.h_gpu, l.outputs*l.batch, LOGISTIC);
+            activate_array_gpu(l.h_gpu, l.outputs*l.batch, LOGISTIC, 0);
         }
 
         weighted_sum_gpu(l.state_gpu, l.h_gpu, l.z_gpu, l.outputs*l.batch, l.output_gpu);
@@ -336,24 +336,24 @@ void backward_gru_layer_gpu(layer l, network net)
         copy_gpu(l.outputs*l.batch, ur.output_gpu, 1, l.r_gpu, 1);
         axpy_gpu(l.outputs*l.batch, 1, wr.output_gpu, 1, l.r_gpu, 1);
 
-        activate_array_gpu(l.z_gpu, l.outputs*l.batch, LOGISTIC);
-        activate_array_gpu(l.r_gpu, l.outputs*l.batch, LOGISTIC);
+        activate_array_gpu(l.z_gpu, l.outputs*l.batch, LOGISTIC, 0);
+        activate_array_gpu(l.r_gpu, l.outputs*l.batch, LOGISTIC, 0);
 
         copy_gpu(l.outputs*l.batch, uh.output_gpu, 1, l.h_gpu, 1);
         axpy_gpu(l.outputs*l.batch, 1, wh.output_gpu, 1, l.h_gpu, 1);
 
         if(l.tanh){
-            activate_array_gpu(l.h_gpu, l.outputs*l.batch, TANH);
+            activate_array_gpu(l.h_gpu, l.outputs*l.batch, TANH, 0);
         } else {
-            activate_array_gpu(l.h_gpu, l.outputs*l.batch, LOGISTIC);
+            activate_array_gpu(l.h_gpu, l.outputs*l.batch, LOGISTIC, 0);
         }
 
         weighted_delta_gpu(l.state_gpu, l.h_gpu, l.z_gpu, prev_delta_gpu, uh.delta_gpu, uz.delta_gpu, l.outputs*l.batch, l.delta_gpu);
 
         if(l.tanh){
-            gradient_array_gpu(l.h_gpu, l.outputs*l.batch, TANH, uh.delta_gpu);
+            gradient_array_gpu(l.h_gpu, l.outputs*l.batch, TANH, uh.delta_gpu, 0);
         } else {
-            gradient_array_gpu(l.h_gpu, l.outputs*l.batch, LOGISTIC, uh.delta_gpu);
+            gradient_array_gpu(l.h_gpu, l.outputs*l.batch, LOGISTIC, uh.delta_gpu, 0);
         }
 
         copy_gpu(l.outputs*l.batch, uh.delta_gpu, 1, wh.delta_gpu, 1);
@@ -369,10 +369,10 @@ void backward_gru_layer_gpu(layer l, network net)
         if(prev_delta_gpu) mult_add_into_gpu(l.outputs*l.batch, l.forgot_delta_gpu, l.r_gpu, prev_delta_gpu);
         mult_add_into_gpu(l.outputs*l.batch, l.forgot_delta_gpu, l.state_gpu, ur.delta_gpu);
 
-        gradient_array_gpu(l.r_gpu, l.outputs*l.batch, LOGISTIC, ur.delta_gpu);
+        gradient_array_gpu(l.r_gpu, l.outputs*l.batch, LOGISTIC, ur.delta_gpu, 0);
         copy_gpu(l.outputs*l.batch, ur.delta_gpu, 1, wr.delta_gpu, 1);
 
-        gradient_array_gpu(l.z_gpu, l.outputs*l.batch, LOGISTIC, uz.delta_gpu);
+        gradient_array_gpu(l.z_gpu, l.outputs*l.batch, LOGISTIC, uz.delta_gpu, 0);
         copy_gpu(l.outputs*l.batch, uz.delta_gpu, 1, wz.delta_gpu, 1);
 
         s.input_gpu = l.state_gpu;

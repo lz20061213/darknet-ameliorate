@@ -574,21 +574,27 @@ int get_yolo_detections(layer l, int w, int h, int netw, int neth, float thresh,
 void forward_yolo_layer_gpu(const layer l, network net)
 {
     copy_gpu(l.batch*l.inputs, net.input_gpu, 1, l.output_gpu, 1);
-    cuda_pull_array(net.input_gpu, net.input, l.batch*l.inputs);
+
+    if (l.post_training_quantization) {
+        cuda_pull_array(l.output_gpu, l.output, l.batch*l.outputs);
+        restore(l.output, l.batch*l.outputs, *(net.fl));
+        cuda_push_array(l.output_gpu, l.output, l.batch*l.outputs);
+    }
+
     int b, n;
     for (b = 0; b < l.batch; ++b){
         for(n = 0; n < l.n; ++n){
             int index = entry_index(l, b, n*l.w*l.h, 0);
             if (l.use_center_regression) {
-                activate_array_gpu(l.output_gpu + index, 2*l.w*l.h, HALFTANH);
+                activate_array_gpu(l.output_gpu + index, 2*l.w*l.h, HALFTANH, 0);
             } else {
-                activate_array_gpu(l.output_gpu + index, 2*l.w*l.h, LOGISTIC);
+                activate_array_gpu(l.output_gpu + index, 2*l.w*l.h, LOGISTIC, 0);
             }
             if (l.scale_xy != 1.0) {
                 scal_add_gpu(2*l.w*l.h, l.scale_xy, -0.5*(l.scale_xy - 1), l.output_gpu + index, 1); // scale x,y
             }
             index = entry_index(l, b, n*l.w*l.h, 4);
-            activate_array_gpu(l.output_gpu + index, (1+l.classes)*l.w*l.h, LOGISTIC);
+            activate_array_gpu(l.output_gpu + index, (1+l.classes)*l.w*l.h, LOGISTIC, 0);
         }
     }
 

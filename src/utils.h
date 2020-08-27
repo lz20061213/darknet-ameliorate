@@ -13,6 +13,7 @@
     } while (0)
 
 #define TWO_PI 6.2831853071795864769252866f
+#define BITWIDTH 8
 
 double what_time_is_it_now();
 void shuffle(void *arr, size_t n, size_t size);
@@ -27,6 +28,8 @@ void write_all(int fd, char *buffer, size_t bytes);
 int read_all_fail(int fd, char *buffer, size_t bytes);
 int write_all_fail(int fd, char *buffer, size_t bytes);
 void find_replace(char *str, char *orig, char *rep, char *output);
+void replace_image_to_label(const char* input_path, char* output_path);
+void find_replace_extension(char *str, char *orig, char *rep, char *output);
 void malloc_error();
 void file_error(char *s);
 void strip(char *s);
@@ -49,7 +52,14 @@ float sec(clock_t clocks);
 void print_statistics(float *a, int n);
 int int_index(int *a, int val, int n);
 float two_way_max(float a, float b);
+
 // for quantize
+void logicShift(float *data, int n, int bit);
+void logicShiftAlign(float *data, int n, int bit);
+void restore(float*data, int n, int bit);
+void get_max_min(float *data, int n, float* max_data, float* min_data);
+int quantizeOutputs(float* output, int n);
+
 void quantize(float *x, int n, int total_bitwidth, int fraction_bitwidth);
 #endif
 

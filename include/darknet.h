@@ -132,6 +132,7 @@ typedef struct layer layer;
 struct layer{
     LAYER_TYPE type;
     ACTIVATION activation;
+    float leaky_rate;
     COST_TYPE cost_type;
     void (*forward)   (struct layer, struct network);
     void (*mimic_forward)(struct layer, struct network, struct network);
@@ -168,8 +169,19 @@ struct layer{
     int dilation; // add for dilation conv
 
     int quantize; // add for quantization
+    int post_training_quantization;
+    int quantization_aware_training;
     int quantize_feature;
     int scale_weight;
+    int quantize_weight_bitwidth;
+    int quantize_weight_fraction_bitwidth;
+    int quantize_bias_bitwidth;
+    int quantize_bias_fraction_bitwidth;
+    int quantize_feature_bitwidth;
+    int quantize_feature_fraction_bitwidth;
+    int *conv_fl;
+    int *bias_fl;
+    int *x_fl;
 
     int reverse;
     int flatten;
@@ -304,7 +316,7 @@ struct layer{
     float * weights;
     float * weight_updates;
 
-    //for quantize
+    //for quantize (Quantization-aware Training)
     float * merge_weights;
     float * scale_weights;
     float * shift_biases;
@@ -601,8 +613,6 @@ typedef struct network{
     float *input;
     float *truth;
 
-    int quantize;
-
     // for mimic_training
     int *hint_layers;
     int *distill_layers;
@@ -612,14 +622,29 @@ typedef struct network{
     int *mutual_layers;
 
     // for quantize
+    int quantize;
+    int post_training_quantization;
+    int quantization_aware_training;
     int quantize_weight_bitwidth;
     int quantize_weight_fraction_bitwidth;
-    int quantize_feature_bitwidth;
-    int quantize_feature_fraction_bitwidth;
     int quantize_bias_bitwidth;
     int quantize_bias_fraction_bitwidth;
+    int quantize_feature_bitwidth;
+    int quantize_feature_fraction_bitwidth;
     int quantize_freezeBN;
     int quantize_freezeBN_iterpoint;
+    int *fl;
+    int convx_bias_align;
+    // quantize: for keep the fl statistic
+    int write_statistic_fl;
+    int write_statistic_features;  // for quantization_aware_training
+    int write_input;
+    int write_results;
+    int write_yolo_output;
+    FILE *filewriter_fl;
+    FILE *filewriter_features;
+
+    int transfer_input;
 
     float *delta;
     float *workspace;
@@ -784,6 +809,8 @@ float dot_cpu(int N, float *X, int INCX, float *Y, int INCY);
 void axpy_cpu(int N, float ALPHA, float *X, int INCX, float *Y, int INCY);
 void copy_cpu(int N, float *X, int INCX, float *Y, int INCY);
 void scal_cpu(int N, float ALPHA, float *X, int INCX);
+void scal_cpu_int(int N, float ALPHA, float *X, int INCX);
+void add_cpu(int N, int offset, float *X, int INCX);
 void fill_cpu(int N, float ALPHA, float * X, int INCX);
 void normalize_cpu(float *x, float *mean, float *variance, int batch, int filters, int spatial);
 void softmax(float *input, int n, float temp, int stride, float *output);
@@ -933,6 +960,7 @@ void free_detections(detection *dets, int n);
 void reset_network_state(network *net, int b);
 
 char **get_labels(char *filename);
+char **get_labels_custom(char *filename, int *size);
 void do_nms_obj(detection *dets, int total, int classes, float thresh);
 void do_nms_sort(detection *dets, int total, int classes, float thresh);
 void diounms_sort(detection *dets, int total, int classes, float thresh, NMS_KIND nms_kind, float beta1);

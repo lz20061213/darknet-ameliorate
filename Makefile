@@ -12,7 +12,7 @@ ARCH= -gencode arch=compute_30,code=sm_30 \
 #      -gencode arch=compute_20,code=[sm_20,sm_21] \ This one is deprecated?
 
 # This is what I use, uncomment if you know your arch and want to specify
-# ARCH= -gencode arch=compute_52,code=compute_52
+ARCH= -gencode arch=compute_75,code=compute_75
 
 VPATH=./src/:./examples
 SLIB=libdarknet.so
@@ -22,7 +22,7 @@ OBJDIR=./obj/
 
 CC=gcc
 CPP=g++
-NVCC=/usr/local/cuda-9.0/bin/nvcc 
+NVCC=/usr/local/cuda-10.1/bin/nvcc 
 AR=ar
 ARFLAGS=rcs
 OPTS=-Ofast
@@ -43,14 +43,14 @@ CFLAGS+=$(OPTS)
 ifeq ($(OPENCV), 1) 
 COMMON+= -DOPENCV
 CFLAGS+= -DOPENCV
-LDFLAGS+= `pkg-config --libs opencv` -lstdc++
-COMMON+= `pkg-config --cflags opencv` 
+LDFLAGS+= `pkg-config --libs opencv || pkg-config --libs opencv4` -lstdc++
+COMMON+= `pkg-config --cflags opencv || pkg-config --cflags opencv4` 
 endif
 
 ifeq ($(GPU), 1) 
-COMMON+= -DGPU -I/usr/local/cuda-9.0/include/
+COMMON+= -DGPU -I/usr/local/cuda-10.1/include/
 CFLAGS+= -DGPU
-LDFLAGS+= -L/usr/local/cuda-9.0/lib64 -lcuda -lcudart -lcublas -lcurand
+LDFLAGS+= -L/usr/local/cuda-10.1/lib64 -lcuda -lcudart -lcublas -lcurand
 endif
 
 ifeq ($(CUDNN), 1) 

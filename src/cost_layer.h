@@ -7,6 +7,7 @@ typedef layer cost_layer;
 
 COST_TYPE get_cost_type(char *s);
 char *get_cost_string(COST_TYPE a);
+int float_compare (const void * a, const void * b);
 int float_abs_compare (const void * a, const void * b);
 cost_layer make_cost_layer(int batch, int inputs, COST_TYPE type, float scale);
 void forward_cost_layer(const cost_layer l, network net);

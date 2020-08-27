@@ -541,9 +541,9 @@ void forward_mimicutual_yolo_layer_gpu(const layer ls, network snet, network pne
     for (b = 0; b < ls.batch; ++b){
         for(n = 0; n < ls.n; ++n){
             int index = entry_index(ls, b, n*ls.w*ls.h, 0);
-            activate_array_gpu(ls.output_gpu + index, 2*ls.w*ls.h, LOGISTIC);  // x, y activate
+            activate_array_gpu(ls.output_gpu + index, 2*ls.w*ls.h, LOGISTIC, 0);  // x, y activate
             index = entry_index(ls, b, n*ls.w*ls.h, 4);
-            activate_array_gpu(ls.output_gpu + index, (1+ls.classes)*ls.w*ls.h, LOGISTIC);
+            activate_array_gpu(ls.output_gpu + index, (1+ls.classes)*ls.w*ls.h, LOGISTIC, 0);
         }
     }
     // activate peer network
@@ -555,9 +555,9 @@ void forward_mimicutual_yolo_layer_gpu(const layer ls, network snet, network pne
     for (b = 0; b < lp.batch; ++b){
         for(n = 0; n < lp.n; ++n){
             int index = entry_index(lp, b, n*lp.w*lp.h, 0);
-            activate_array_gpu(lp.output_gpu + index, 2*lp.w*lp.h, LOGISTIC);  // x, y activate
+            activate_array_gpu(lp.output_gpu + index, 2*lp.w*lp.h, LOGISTIC, 0);  // x, y activate
             index = entry_index(lp, b, n*lp.w*lp.h, 4);
-            activate_array_gpu(lp.output_gpu + index, (1+lp.classes)*lp.w*lp.h, LOGISTIC);
+            activate_array_gpu(lp.output_gpu + index, (1+lp.classes)*lp.w*lp.h, LOGISTIC, 0);
         }
     }
 

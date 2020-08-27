@@ -188,6 +188,21 @@ void scal_cpu(int N, float ALPHA, float *X, int INCX)
     for(i = 0; i < N; ++i) X[i*INCX] *= ALPHA;
 }
 
+void scal_cpu_int(int N, float ALPHA, float *X, int INCX)
+{
+    int i;
+    for(i = 0; i < N; ++i) X[i*INCX] = (int)(X[i*INCX] *ALPHA + 0.5);
+}
+
+void add_cpu(int N, int offset, float *X, int INCX)
+{
+    int i;
+    for(i = 0; i < N; ++i) {
+        X[i*INCX] += offset;
+        if (X[i*INCX] == -128) X[i*INCX] = -127;
+    }
+}
+
 void fill_cpu(int N, float ALPHA, float *X, int INCX)
 {
     int i;
