@@ -249,10 +249,10 @@ void backward_bias_gpu(float *bias_updates, float *delta, int batch, int n, int 
     check_error(cudaPeekAtLastError());
 }
 
-__global__ void backward_quantize_kernel(float *x_updates, float *x, int n, int bound) {
+__global__ void backward_quantize_kernel(float *x_updates, float *x, int n, float bound, float shift) {
     int i = (blockIdx.x + blockIdx.y*gridDim.x) * blockDim.x + threadIdx.x;
     if (i < n) {
-        if (x[i] < -bound || x[i] > bound) x_updates[i] = 0;
+        if (x[i] < -bound || x[i] > bound - (float) 1.0 / shift) x_updates[i] = 0;
     }
 }
 
@@ -260,7 +260,7 @@ void backward_quantize_gpu(float *x_updates, float *x, int n, int total_bitwidth
     int integer_bitwidth = total_bitwidth - fraction_bitwidth;
     float bound = pow(2, integer_bitwidth - 1);
     float shift = pow(2, fraction_bitwidth);
-    backward_quantize_kernel<<<cuda_gridsize(n), BLOCK>>>(x_updates, x, n, bound);
+    backward_quantize_kernel<<<cuda_gridsize(n), BLOCK>>>(x_updates, x, n, bound, shift);
 }
 
 /*
@@ -575,11 +575,11 @@ __global__ void constrain_kernel(int N, float ALPHA, float *X, int INCX)
     if(i < N) X[i*INCX] = fminf(ALPHA, fmaxf(-ALPHA, X[i*INCX]));
 }
 
-__global__ void quantize_kernel(float *x, int n, int shift, int bound)
+__global__ void quantize_kernel(float *x, int n, float shift, float bound)
 {
     int i = (blockIdx.x + blockIdx.y*gridDim.x) * blockDim.x + threadIdx.x;
     if (i < n) {
-        x[i] = fminf(bound, fmaxf(-bound, round(x[i] * shift) / shift));
+        x[i] = fminf(bound - (float) 1.0 / shift, fmaxf(-bound, round(x[i] * shift) / shift));
     }
 }
 

@@ -5,6 +5,7 @@
 extern "C" {
 #include "maxpool_layer.h"
 #include "cuda.h"
+#include "utils.h"
 }
 
 __global__ void forward_maxpool_layer_kernel(int n, int in_h, int in_w, int in_c, int stride, int size, int pad, float *input, float *output, int *indexes)
@@ -94,17 +95,6 @@ extern "C" void forward_maxpool_layer_gpu(maxpool_layer layer, network net)
 
     forward_maxpool_layer_kernel<<<cuda_gridsize(n), BLOCK>>>(n, layer.h, layer.w, layer.c, layer.stride, layer.size, layer.pad, net.input_gpu, layer.output_gpu, layer.indexes_gpu);
     check_error(cudaPeekAtLastError());
-
-    // for test
-    /*
-    cuda_pull_array(layer.output_gpu, layer.output, layer.batch*layer.outputs);
-    int t;
-    printf("%d output: ", layer.index);
-    for (t = 0; t < 10; ++t) {
-        printf("%f ", layer.output[t]);
-    }
-    printf("\n");
-    */
 
     if (net.write_results) {
         cuda_pull_array(layer.output_gpu, layer.output, layer.batch*layer.outputs);

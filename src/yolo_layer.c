@@ -598,16 +598,6 @@ void forward_yolo_layer_gpu(const layer l, network net)
         }
     }
 
-    /*
-    cuda_pull_array(l.output_gpu, l.output, l.batch*l.outputs);
-    int t;
-    printf("yolo: %d output: ", l.index);
-    for (t = 0; t < 10; ++t) {
-        printf("%f ", l.output[t]);
-    }
-    printf("\n");
-    */
-
     if(!net.train || l.onlyforward){
         cuda_pull_array(l.output_gpu, l.output, l.batch*l.outputs);
         return;

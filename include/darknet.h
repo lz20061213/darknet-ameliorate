@@ -377,7 +377,7 @@ struct layer{
     float *dc_cpu; 
 
     float * binary_input;
-    float * quantize_input;
+    float * quantize_output;
 
     struct layer *input_layer;
     struct layer *self_layer;
@@ -498,7 +498,7 @@ struct layer{
     float * scale_weights_gpu;
     float * shift_biases_gpu;
     float * merge_biases_gpu;
-    float * quantize_input_gpu;
+    float * quantize_output_gpu;
 
     float * scales_gpu;
     float * scale_updates_gpu;

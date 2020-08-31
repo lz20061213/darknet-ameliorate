@@ -783,7 +783,7 @@ layer parse_reorg(list *options, size_params params)
     return layer;
 }
 
-maxpool_layer parse_maxpool(list *options, size_params params)
+maxpool_layer parse_maxpool(list *options, size_params params, network *net)
 {
     int stride = option_find_int(options, "stride",1);
     int size = option_find_int(options, "size",stride);
@@ -797,6 +797,7 @@ maxpool_layer parse_maxpool(list *options, size_params params)
     if(!(h && w && c)) error("Layer before maxpool layer must output image.");
 
     maxpool_layer layer = make_maxpool_layer(batch,h,w,c,size,stride,padding);
+    layer.post_training_quantization = option_find_int_quiet(options, "post_training_quantization", net->post_training_quantization);
     return layer;
 }
 
@@ -1304,7 +1305,7 @@ network *parse_network_cfg(char *filename)
         }else if(lt == BATCHNORM){
             l = parse_batchnorm(options, params);
         }else if(lt == MAXPOOL){
-            l = parse_maxpool(options, params);
+            l = parse_maxpool(options, params, net);
         }else if(lt == REORG){
             l = parse_reorg(options, params);
         }else if(lt == AVGPOOL){

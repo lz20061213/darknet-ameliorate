@@ -240,7 +240,7 @@ convolutional_layer make_convolutional_layer(int batch, int h, int w, int c, int
         l.scale_weights = calloc(l.nweights, sizeof(float));
         l.shift_biases = calloc(n, sizeof(float));
         l.merge_biases = calloc(n, sizeof(float));
-        l.quantize_input = calloc(l.inputs*l.batch, sizeof(float));
+        l.quantize_output = calloc(l.outputs*l.batch, sizeof(float));
     }
 
     if(batch_normalize){
@@ -316,7 +316,7 @@ convolutional_layer make_convolutional_layer(int batch, int h, int w, int c, int
             l.scale_weights_gpu = cuda_make_array(l.scale_weights, l.nweights);
             l.shift_biases_gpu = cuda_make_array(l.shift_biases, n);
             l.merge_biases_gpu = cuda_make_array(l.merge_biases, n);
-            l.quantize_input_gpu = cuda_make_array(0, l.inputs*l.batch);
+            l.quantize_output_gpu = cuda_make_array(0, l.outputs*l.batch);
             l.weight_updates_gpu_part = cuda_make_array(l.weight_updates, l.nweights);
             l.bias_updates_gpu_part = cuda_make_array(l.bias_updates, n);
         }
@@ -431,7 +431,7 @@ void resize_convolutional_layer(convolutional_layer *l, int w, int h)
     }
 
     if(l->quantize) {
-        l->quantize_input = realloc(l->quantize_input, l->batch*l->inputs*sizeof(float));
+        l->quantize_output = realloc(l->quantize_output, l->batch*l->outputs*sizeof(float));
     }
 
 #ifdef GPU
@@ -457,8 +457,8 @@ void resize_convolutional_layer(convolutional_layer *l, int w, int h)
     }
 
     if(l->quantize) {
-        cuda_free(l->quantize_input_gpu);
-        l->quantize_input_gpu = cuda_make_array(l->quantize_input, l->batch*l->inputs);
+        cuda_free(l->quantize_output_gpu);
+        l->quantize_output_gpu = cuda_make_array(l->quantize_output, l->batch*l->outputs);
     }
 #ifdef CUDNN
     cudnn_convolutional_setup(l);
