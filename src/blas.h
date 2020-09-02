@@ -104,7 +104,7 @@ void flatten_gpu(float *x, int spatial, int layers, int batch, int forward, floa
 void softmax_tree(float *input, int spatial, int batch, int stride, float temp, float *output, tree hier);
 void upsample_gpu(float *in, int w, int h, int c, int batch, int stride, int forward, float scale, float *out);
 
-void quantize_gpu(float *x, int n, int total_bitwidth, int fraction_bitwidth);
+void quantize_gpu(float *x, int n, int total_bitwidth, int fraction_bitwidth, int net_fraction_bitwidth, int is_round);
 void scale_weights_gpu(float *weights, int nweights, int n, float *gamma, float *variance);
 void scale_outputs_gpu(float *outputs, float *variance, float *rolling_variance, int batch, int n, int size);
 void shift_bias_gpu(float *new_bias, int n, float *scales, float *bias, float *mean, float *variance);

@@ -575,11 +575,19 @@ __global__ void constrain_kernel(int N, float ALPHA, float *X, int INCX)
     if(i < N) X[i*INCX] = fminf(ALPHA, fmaxf(-ALPHA, X[i*INCX]));
 }
 
-__global__ void quantize_kernel(float *x, int n, float shift, float bound)
+__global__ void quantize_kernel(float *x, int n, float shift, float bound, int diff, float static_rate, int is_round)
 {
     int i = (blockIdx.x + blockIdx.y*gridDim.x) * blockDim.x + threadIdx.x;
     if (i < n) {
-        x[i] = fminf(bound - (float) 1.0 / shift, fmaxf(-bound, round(x[i] * shift) / shift));
+        if (is_round) {
+            x[i] = fminf(bound - (float)1.0 / shift, fmaxf(-bound, round(x[i] * shift) / shift));
+        }
+        else
+        {
+            // make the quantization_aware_training same as post_training_quantization
+            float quantize_x = ((int)(x[i] * static_rate) >> diff) / shift;
+            x[i] = fminf(bound - (float)1.0 / shift, fmax(-bound, quantize_x));
+        }
     }
 }
 
@@ -870,12 +878,14 @@ extern "C" void constrain_gpu(int N, float ALPHA, float * X, int INCX)
     check_error(cudaPeekAtLastError());
 }
 
-extern "C" void quantize_gpu(float * x, int n, int total_bitwidth, int fraction_bitwidth)
+extern "C" void quantize_gpu(float * x, int n, int total_bitwidth, int fraction_bitwidth, int net_fraction_bitwidth, int is_round)
 {
     int integer_bitwidth = total_bitwidth - fraction_bitwidth;
     float bound = pow(2, integer_bitwidth - 1);
     float shift = pow(2, fraction_bitwidth);
-    quantize_kernel<<<cuda_gridsize(n), BLOCK>>>(x, n, shift, bound);
+    int diff = net_fraction_bitwidth - fraction_bitwidth;
+    float static_rate = pow(2, net_fraction_bitwidth);
+    quantize_kernel<<<cuda_gridsize(n), BLOCK>>>(x, n, shift, bound, diff, static_rate, is_round);
     check_error(cudaPeekAtLastError());
 }
 
