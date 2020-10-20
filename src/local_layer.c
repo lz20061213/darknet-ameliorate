@@ -211,7 +211,7 @@ void forward_local_layer_gpu(const local_layer l, network net)
             gemm_gpu(0,0,m,n,k,1,a,k,b,locations,1,c,locations);
         }
     }
-    activate_array_gpu(l.output_gpu, l.outputs*l.batch, l.activation);
+    activate_array_gpu(l.output_gpu, l.outputs*l.batch, l.activation, 0);
 }
 
 void backward_local_layer_gpu(local_layer l, network net)
@@ -219,7 +219,7 @@ void backward_local_layer_gpu(local_layer l, network net)
     int i, j;
     int locations = l.out_w*l.out_h;
 
-    gradient_array_gpu(l.output_gpu, l.outputs*l.batch, l.activation, l.delta_gpu);
+    gradient_array_gpu(l.output_gpu, l.outputs*l.batch, l.activation, l.delta_gpu, 0);
     for(i = 0; i < l.batch; ++i){
         axpy_gpu(l.outputs, 1, l.delta_gpu + i*l.outputs, 1, l.bias_updates_gpu, 1);
     }

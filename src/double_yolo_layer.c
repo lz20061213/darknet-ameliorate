@@ -444,13 +444,13 @@ void forward_double_yolo_layer_gpu(const layer l, network net)
     //printf("after copy_gpu\n");
     // activate
     // activate all classes
-    activate_array_gpu(l.output_gpu, cls.batch * cls.outputs, LOGISTIC);
+    activate_array_gpu(l.output_gpu, cls.batch * cls.outputs, LOGISTIC, 0);
     // activate x, y
     int b, n;
     for (b = 0; b < l.batch; ++b){
         for(n = 0; n < l.n; ++n){
             int index = entry_loc_index(l, net, b, n*l.w*l.h, 0);
-            activate_array_gpu(l.output_gpu + index, 2*l.w*l.h, LOGISTIC);
+            activate_array_gpu(l.output_gpu + index, 2*l.w*l.h, LOGISTIC, 0);
             if (l.scale_xy != 1.0) {
                 scal_add_gpu(2*l.w*l.h, l.scale_xy, -0.5*(l.scale_xy - 1), l.output_gpu + index, 1); // scale x,y
             }

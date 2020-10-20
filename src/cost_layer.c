@@ -118,6 +118,13 @@ void push_cost_layer(cost_layer l)
     cuda_push_array(l.delta_gpu, l.delta, l.batch*l.inputs);
 }
 
+int float_compare (const void * a, const void * b)
+{
+    float fa = *(const float*) a;
+    float fb = *(const float*) b;
+    return (fa > fb) - (fa < fb);
+}
+
 int float_abs_compare (const void * a, const void * b)
 {
     float fa = *(const float*) a;

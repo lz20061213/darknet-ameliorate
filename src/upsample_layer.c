@@ -25,7 +25,7 @@ layer make_upsample_layer(int batch, int w, int h, int c, int stride)
     l.outputs = l.out_w*l.out_h*l.out_c;
     l.inputs = l.w*l.h*l.c;
     l.delta =  calloc(l.outputs*batch, sizeof(float));
-    l.output = calloc(l.outputs*batch, sizeof(float));;
+    l.output = calloc(l.outputs*batch, sizeof(float));
 
     l.forward = forward_upsample_layer;
     l.backward = backward_upsample_layer;
@@ -93,6 +93,7 @@ void forward_upsample_layer_gpu(const layer l, network net)
     }else{
         upsample_gpu(net.input_gpu, l.w, l.h, l.c, l.batch, l.stride, 1, l.scale, l.output_gpu);
     }
+    if (l.post_training_quantization) *(l.x_fl) = *(net.fl);
 }
 
 void backward_upsample_layer_gpu(const layer l, network net)

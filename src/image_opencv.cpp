@@ -32,13 +32,14 @@ image ipl_to_image(IplImage* src)
     int c = src->nChannels;
     image im = make_image(w, h, c);
     unsigned char *data = (unsigned char *)src->imageData;
+
     int step = src->widthStep;
     int i, j, k;
 
     for(i = 0; i < h; ++i){
         for(k= 0; k < c; ++k){
             for(j = 0; j < w; ++j){
-                im.data[k*w*h + i*w + j] = data[i*step + j*c + k]/255.;
+                im.data[k*w*h + i*w + j] = data[i*step + j*c + k] / 255.;
             }
         }
     }
@@ -63,6 +64,7 @@ image mat_to_image(Mat m)
     IplImage ipl = m;
     image im = ipl_to_image(&ipl);
     rgbgr_image(im);
+
     return im;
 }
 
@@ -92,12 +94,13 @@ image load_image_cv(char *filename, int channels)
     int flag = -1;
     if (channels == 0) flag = -1;
     else if (channels == 1) flag = 0;
-    else if (channels == 3) flag = 1;
+    else if (channels == 3) flag = 1; // cv::IMREAD_REDUCED_COLOR_2;
     else {
         fprintf(stderr, "OpenCV can't force load with %d channels\n", channels);
     }
     Mat m;
     m = imread(filename, flag);
+
     if(!m.data){
         fprintf(stderr, "Cannot load image \"%s\"\n", filename);
         char buff[256];

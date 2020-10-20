@@ -192,7 +192,7 @@ layer parse_deconvolutional(list *options, size_params params)
 }
 
 
-convolutional_layer parse_convolutional(list *options, size_params params)
+convolutional_layer parse_convolutional(list *options, size_params params, network *net)
 {
     int n = option_find_int(options, "filters", 1);
     int size = option_find_int(options, "size", 1);
@@ -216,14 +216,60 @@ convolutional_layer parse_convolutional(list *options, size_params params)
     int batch_normalize = option_find_int_quiet(options, "batch_normalize", 0);
     int binary = option_find_int_quiet(options, "binary", 0);
     int xnor = option_find_int_quiet(options, "xnor", 0);
-    int quantize = option_find_int_quiet(options, "quantize", 0);
+    int quantize = option_find_int_quiet(options, "quantize", net->quantize);
 
     convolutional_layer layer = make_convolutional_layer(batch,h,w,c,n,groups,size,stride,dilation,padding,activation, batch_normalize, binary, xnor, params.net->adam, quantize);
+
     layer.flipped = option_find_int_quiet(options, "flipped", 0);
     layer.dot = option_find_float_quiet(options, "dot", 0);
     layer.quantize_feature = option_find_int_quiet(options, "quantize_feature", 1);
     layer.scale_weight = option_find_int_quiet(options, "scale_weight", 0);
     layer.isprune = option_find_int_quiet(options, "isprune", 0);
+    layer.quantize_weight_bitwidth = option_find_int_quiet(options, "weight_bitwidth", net->quantize_weight_bitwidth);
+    layer.quantize_weight_fraction_bitwidth = option_find_int_quiet(options, "weight_fraction_bitwidth", net->quantize_weight_fraction_bitwidth);
+    layer.quantize_bias_bitwidth = option_find_int_quiet(options, "bias_bitwidth", net->quantize_bias_bitwidth);
+    layer.quantize_bias_fraction_bitwidth = option_find_int_quiet(options, "bias_fraction_bitwidth", net->quantize_bias_fraction_bitwidth);
+    layer.quantize_feature_bitwidth = option_find_int_quiet(options, "feature_bitwidth", net->quantize_feature_bitwidth);
+    layer.quantize_feature_fraction_bitwidth = option_find_int_quiet(options, "feature_fraction_bitwidth", net->quantize_feature_fraction_bitwidth);
+    layer.quantize_per_channel = option_find_int_quiet(options, "per_channel", net->quantize_per_channel);
+    layer.quantize_per_channel_keep_rate = option_find_float_quiet(options, "per_channel_keep_rate", net->quantize_per_channel_keep_rate);
+
+    layer.post_training_quantization = option_find_int_quiet(options, "post_training_quantization", net->post_training_quantization);
+    layer.quantization_aware_training = option_find_int_quiet(options, "quantization_aware_training", net->quantization_aware_training);
+
+    assert(layer.quantize == layer.post_training_quantization + layer.quantization_aware_training);
+
+    if (layer.post_training_quantization) {
+        if (layer.quantize_per_channel) {
+            layer.conv_fls = calloc(layer.n, sizeof(int));
+            layer.bias_fls = calloc(layer.n, sizeof(int));
+            // read from .weights
+            int i;
+            for(i=0; i<layer.n; ++i) {
+                layer.conv_fls[i] = 0;
+                layer.bias_fls[i] = 0;
+            }
+        } else {
+            layer.conv_fl = calloc(1, sizeof(int));
+            layer.bias_fl = calloc(1, sizeof(int));
+            // read from .weights
+            *(layer.conv_fl) = option_find_int_quiet(options, "conv_fl", 0);
+            *(layer.bias_fl) = option_find_int_quiet(options, "bias_fl", 0);
+        }
+        layer.x_fl = calloc(1, sizeof(int));
+        // read from .cfg
+        *(layer.x_fl) = option_find_int_quiet(options, "x_fl", 0);
+    }
+
+    if (layer.quantization_aware_training) {
+        if (layer.quantize_per_channel) {
+            //printf("allow memory for bitwidths\n");
+            layer.quantize_weight_fraction_bitwidths = calloc(layer.n, sizeof(int));
+            layer.quantize_bias_fraction_bitwidths = calloc(layer.n, sizeof(int));
+        }
+    }
+
+    layer.leaky_rate = option_find_float_quiet(options, "leaky_rate", .1);
 
     return layer;
 }
@@ -325,7 +371,7 @@ int *parse_yolo_mask(char *a, int *num)
     return mask;
 }
 
-layer parse_yolo(list *options, size_params params)
+layer parse_yolo(list *options, size_params params, network *net)
 {
     int classes = option_find_int(options, "classes", 20);
     int total = option_find_int(options, "num", 1);
@@ -354,6 +400,11 @@ layer parse_yolo(list *options, size_params params)
     l.cls_normalizer = option_find_float_quiet(options, "cls_normalizer", 1);
 
     l.label_smooth_rate = option_find_float_quiet(options, "label_smooth_rate", 0);
+
+    l.quantize =  option_find_int_quiet(options, "quantize", net->quantize);
+    l.post_training_quantization = option_find_int_quiet(options, "post_training_quantization", net->post_training_quantization);
+    l.quantization_aware_training = option_find_int_quiet(options, "quantization_aware_training", net->quantization_aware_training);
+
 
     char *iou_loss = option_find_str_quiet(options, "iou_loss", "mse");   //
     if (strcmp(iou_loss, "mse") == 0) l.iou_loss = MSE;
@@ -753,7 +804,7 @@ layer parse_reorg(list *options, size_params params)
     return layer;
 }
 
-maxpool_layer parse_maxpool(list *options, size_params params)
+maxpool_layer parse_maxpool(list *options, size_params params, network *net)
 {
     int stride = option_find_int(options, "stride",1);
     int size = option_find_int(options, "size",stride);
@@ -767,6 +818,7 @@ maxpool_layer parse_maxpool(list *options, size_params params)
     if(!(h && w && c)) error("Layer before maxpool layer must output image.");
 
     maxpool_layer layer = make_maxpool_layer(batch,h,w,c,size,stride,padding);
+    layer.post_training_quantization = option_find_int_quiet(options, "post_training_quantization", net->post_training_quantization);
     return layer;
 }
 
@@ -825,6 +877,7 @@ layer parse_shortcut(list *options, size_params params, network *net)
     s.activation = activation;
     s.alpha = option_find_float_quiet(options, "alpha", 1);
     s.beta = option_find_float_quiet(options, "beta", 1);
+    s.leaky_rate = option_find_float_quiet(options, "leaky_rate", .1);
     return s;
 }
 
@@ -868,6 +921,13 @@ layer parse_upsample(list *options, size_params params, network *net)
     int stride = option_find_int(options, "stride",2);
     layer l = make_upsample_layer(params.batch, params.w, params.h, params.c, stride);
     l.scale = option_find_float_quiet(options, "scale", 1);
+
+    l.post_training_quantization = option_find_int_quiet(options, "post_training_quantization", net->post_training_quantization);
+    if (l.post_training_quantization) {
+        l.x_fl = calloc(1, sizeof(int));
+        *(l.x_fl) = 0;
+    }
+
     return l;
 }
 
@@ -907,6 +967,12 @@ route_layer parse_route(list *options, size_params params, network *net)
         }else{
             layer.out_h = layer.out_w = layer.out_c = 0;
         }
+    }
+
+    layer.post_training_quantization = option_find_int_quiet(options, "post_training_quantization", net->post_training_quantization);
+    if (layer.post_training_quantization) {
+        layer.x_fl = calloc(1, sizeof(int));
+        *(layer.x_fl) = 0;
     }
 
     return layer;
@@ -1041,8 +1107,8 @@ void parse_net_options(list *options, network *net)
     net->w = option_find_int_quiet(options, "width",0);
     net->c = option_find_int_quiet(options, "channels",0);
     net->inputs = option_find_int_quiet(options, "inputs", net->h * net->w * net->c);
-    net->max_crop = option_find_int_quiet(options, "max_crop",net->w*2);
-    net->min_crop = option_find_int_quiet(options, "min_crop",net->w);
+    net->max_crop = option_find_int_quiet(options, "max_crop", net->w*2);
+    net->min_crop = option_find_int_quiet(options, "min_crop", net->w);
     net->max_ratio = option_find_float_quiet(options, "max_ratio", (float) net->max_crop / net->w);
     net->min_ratio = option_find_float_quiet(options, "min_ratio", (float) net->min_crop / net->w);
     net->center = option_find_int_quiet(options, "center",0);
@@ -1144,6 +1210,18 @@ void parse_net_options(list *options, network *net)
     net->num_mimic_layer = n;
 
     net->quantize = option_find_int_quiet(options, "quantize", 0);
+    net->post_training_quantization = option_find_int_quiet(options, "post_training_quantization", 0);
+    net->quantization_aware_training = option_find_int_quiet(options, "quantization_aware_training", 0);
+    assert(net->quantize == net->post_training_quantization + net->quantization_aware_training);
+    net->transfer_input = option_find_int_quiet(options, "transfer_input", 0);
+
+    net->convx_bias_align = option_find_int_quiet(options, "convx_bias_align", 0);
+    net->write_statistic_fl = option_find_int_quiet(options, "write_statistic_fl", 0);
+    net->write_input = option_find_int_quiet(options, "write_input", 0);
+    net->write_results = option_find_int_quiet(options, "write_results", 0);
+    net->write_yolo_output = option_find_int_quiet(options, "write_yolo_output", 0);
+    net->write_statistic_features = option_find_int_quiet(options, "write_statistic_features", 0);
+
     net->quantize_weight_bitwidth = option_find_int_quiet(options, "weight_bitwidth", 8);
     net->quantize_weight_fraction_bitwidth = option_find_int_quiet(options, "weight_fraction_bitwidth", 6);
     net->quantize_feature_bitwidth = option_find_int_quiet(options, "feature_bitwidth", 8);
@@ -1152,7 +1230,12 @@ void parse_net_options(list *options, network *net)
     net->quantize_bias_fraction_bitwidth = option_find_int_quiet(options, "bias_fraction_bitwidth", 10);
     net->quantize_freezeBN_iterpoint = option_find_int_quiet(options, "quantize_freezeBN_iterpoint", 30000);
 
+    net->quantize_per_channel = option_find_int_quiet(options, "per_channel", 0);
+    net->quantize_per_channel_keep_rate = option_find_float_quiet(options, "per_channel_keep_rate", 0.8);
+
+
     net->downsample_scale = option_find_int_quiet(options, "downsample_scale", 32);
+
 }
 
 int is_network(section *s)
@@ -1196,7 +1279,7 @@ network *parse_network_cfg(char *filename)
         layer l = {0};
         LAYER_TYPE lt = string_to_layer_type(s->type);
         if(lt == CONVOLUTIONAL){
-            l = parse_convolutional(options, params);
+            l = parse_convolutional(options, params, net);
         }else if(lt == DECONVOLUTIONAL){
             l = parse_deconvolutional(options, params);
         }else if(lt == LOCAL){
@@ -1226,7 +1309,7 @@ network *parse_network_cfg(char *filename)
         }else if(lt == REGION){
             l = parse_region(options, params);
         }else if(lt == YOLO){
-            l = parse_yolo(options, params);
+            l = parse_yolo(options, params, net);
         }else if(lt == DISTILL_YOLO) {
             l = parse_distill_yolo(options, params);
         }else if(lt == MUTUAL_YOLO) {
@@ -1247,7 +1330,7 @@ network *parse_network_cfg(char *filename)
         }else if(lt == BATCHNORM){
             l = parse_batchnorm(options, params);
         }else if(lt == MAXPOOL){
-            l = parse_maxpool(options, params);
+            l = parse_maxpool(options, params, net);
         }else if(lt == REORG){
             l = parse_reorg(options, params);
         }else if(lt == AVGPOOL){
@@ -1609,6 +1692,16 @@ void load_convolutional_weights(layer l, FILE *fp)
     if(l.numload) l.n = l.numload;
     int num = l.c/l.groups*l.n*l.size*l.size;
     fread(l.biases, sizeof(float), l.n, fp);
+
+    if(l.post_training_quantization) {
+        if (l.quantize_per_channel) {
+            fread(l.bias_fls, sizeof(int), l.n, fp);
+        } else {
+            fread(l.bias_fl, sizeof(int), 1, fp);
+            //printf("l.bias_fl: %d ", *(l.bias_fl));
+        }
+    }
+
     if (l.batch_normalize && (!l.dontloadscales)){
         //printf("load batchnorm\n");
         fread(l.scales, sizeof(float), l.n, fp);
@@ -1644,10 +1737,20 @@ void load_convolutional_weights(layer l, FILE *fp)
             printf("\n");
         }
     }
+
     fread(l.weights, sizeof(float), num, fp);
 
-    // CHECK /255 for the first convolution in training
-    if(l.quantize && l.scale_weight) {
+    if(l.post_training_quantization) {
+        if (l.quantize_per_channel) {
+            fread(l.conv_fls, sizeof(int), l.n, fp);
+        } else {
+            fread(l.conv_fl, sizeof(int), 1, fp);
+        }
+        //printf("l.conv_fl: %d\n", *(l.conv_fl));
+    }
+
+    // CHECK /255 for the first convolution in quantization_aware_training
+    if(l.quantization_aware_training && l.scale_weight) {
         scal_cpu(l.nweights, 1 / 255., l.weights, 1);
     }
 
@@ -1797,3 +1900,102 @@ void fuse_conv_batchnorm(network *net)
     }
 }
 
+int get_appr_range(float *X, int n, int bitwidth, float keep_rate) {
+    //printf("enter get_appr_range\n");
+    float Xmax, Xmin;
+    int i, j, total_shift, appr_shift;
+
+    get_max_min(X, n, &Xmax, &Xmin);
+    //printf("printf max %f, min %f\n", Xmax, Xmin);
+
+    total_shift = ceil(log(fabs(Xmax) > fabs(Xmin) ? fabs(Xmax):fabs(Xmin)) / log(2));
+    //total_bound = pow(2, total_shift);
+    //printf("printf %d %f\n", total_shift, total_bound);
+
+    appr_shift = total_shift;
+    for (i = 1; i <= 5; ++i) {
+        float bound = pow(2, total_shift - i);
+        float precsion = pow(2, -(bitwidth - 1 - (total_shift - i)));
+        //printf("printf bound %f, precsion %f\n", bound, precsion);
+        // sum the num of X range in [-bound, bound - precsion]
+        int count = 0;
+        for (j = 0; j < n; ++j) {
+            if (X[j] >= -bound && X[j] <= bound - precsion)
+                count++;
+        }
+        //printf("count %d, keep: %f\n", count, n * keep_rate);
+        if (count >= n * keep_rate) {
+            appr_shift = total_shift - i;
+        }
+    }
+    //printf("appr_shift: %d\n", bitwidth - 1 - appr_shift);
+    return (bitwidth - 1 - appr_shift);
+}
+
+void calculate_appr_fracs(network **nets, int n)
+{
+    // we use network 0 for calculation
+    network *rep = nets[0];
+    int i, j, k;
+    int net_fl = 0;
+    for(i = 0; i < rep->n; ++i) {
+        layer *l = &rep->layers[i];
+        if (l->type == CONVOLUTIONAL) {
+            //printf("convolutional %d\n", i);
+            const size_t filter_size = l->size*l->size*l->c / l->groups;
+            float *merge_a_per_channel = calloc(filter_size, sizeof(float));
+            //float merge_b_per_channel;
+            if (l->batch_normalize) {
+                for (j = 0; j < l->n; ++j) {
+                    for (k = 0; k < filter_size; ++k) {
+                        int w_index = j*filter_size + k;
+                        merge_a_per_channel[k] = (double)l->weights[w_index] * l->scales[j] / (sqrt((double)l->rolling_variance[j] + .00001));
+                    }
+
+                    //merge_b_per_channel = l->biases[j] - (double)l->scales[j] * l->rolling_mean[j] / (sqrt((double)l->rolling_variance[j] + .00001));
+
+                    // get_appr_range of weights and bias
+                    l->quantize_weight_fraction_bitwidths[j] = get_appr_range(merge_a_per_channel, filter_size, l->quantize_weight_bitwidth, l->quantize_per_channel_keep_rate);
+                    // align bias to conv(x)
+                    l->quantize_bias_fraction_bitwidths[j] = l->quantize_weight_fraction_bitwidths[j] + net_fl;
+                    //printf("channel %d: %d %d\n", j, l->quantize_weight_fraction_bitwidths[j], l->quantize_bias_fraction_bitwidths[j]);
+                }
+            } else {
+                for (j = 0; j < l->n; ++j) {
+                    for (k = 0; k < filter_size; ++k) {
+                        int w_index = j*filter_size + k;
+                        merge_a_per_channel[k] = (double)l->weights[w_index];
+                    }
+                    //merge_b_per_channel = l->biases[j];
+
+                    // get_appr_range of weights and bias
+                    l->quantize_weight_fraction_bitwidths[j] = get_appr_range(merge_a_per_channel, filter_size, l->quantize_weight_bitwidth, l->quantize_per_channel_keep_rate);
+
+                    // align bias to conv(x)
+                    l->quantize_bias_fraction_bitwidths[j] = l->quantize_weight_fraction_bitwidths[j] + net_fl;
+                    //printf("channel %d: %d %d\n", j, l->quantize_weight_fraction_bitwidths[j], l->quantize_bias_fraction_bitwidths[j]);
+                }
+            }
+            free(merge_a_per_channel);
+            net_fl = l->quantize_feature_fraction_bitwidth;
+            //printf("net_fl: %d\n", net_fl);
+        } else if (l->type == ROUTE) {
+            int index = l->input_layers[0];
+            if (rep->layers[index].type == UPSAMPLE)
+                index -= 1;
+            net_fl = rep->layers[index].quantize_feature_fraction_bitwidth;
+        }
+    }
+
+    // copy the quantize_weight_fraction_bitwidths/quantize_bias_fraction_bitwidths to all networks
+    for (i = 1; i < n; ++i) {
+        for (j = 0; j < rep->n; ++j) {
+            if (rep->layers[j].type == CONVOLUTIONAL) {
+                for (k = 0; k < rep->layers[j].n; ++k) {
+                    nets[i]->layers[j].quantize_weight_fraction_bitwidths[k] = rep->layers[j].quantize_weight_fraction_bitwidths[k];
+                    nets[i]->layers[j].quantize_bias_fraction_bitwidths[k] = rep->layers[j].quantize_bias_fraction_bitwidths[k];
+                }
+            }
+        }
+    }
+}

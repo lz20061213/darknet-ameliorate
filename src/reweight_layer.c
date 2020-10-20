@@ -133,13 +133,13 @@ void forward_reweight_layer_gpu(const reweight_layer l, network net)
         }
     }
 
-    activate_array_gpu(l.output_gpu, l.outputs*l.batch, l.activation);
+    activate_array_gpu(l.output_gpu, l.outputs*l.batch, l.activation, 0);
 
 }
 
 void backward_reweight_layer_gpu(const reweight_layer l, network net)
 {
-    gradient_array_gpu(l.output_gpu, l.outputs*l.batch, l.activation, l.delta_gpu);
+    gradient_array_gpu(l.output_gpu, l.outputs*l.batch, l.activation, l.delta_gpu, 0);
 
     int i, j, k;
     int scale_offset = 0;

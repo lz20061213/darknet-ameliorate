@@ -1,6 +1,7 @@
 #include "route_layer.h"
 #include "cuda.h"
 #include "blas.h"
+#include "utils.h"
 
 #include <stdio.h>
 
@@ -23,7 +24,7 @@ route_layer make_route_layer(int batch, int n, int *input_layers, int *input_siz
     l.outputs = outputs;
     l.inputs = outputs;
     l.delta =  calloc(outputs*batch, sizeof(float));
-    l.output = calloc(outputs*batch, sizeof(float));;
+    l.output = calloc(outputs*batch, sizeof(float));
 
     l.forward = forward_route_layer;
     l.backward = backward_route_layer;
@@ -68,7 +69,7 @@ void resize_route_layer(route_layer *l, network *net)
     l->output_gpu  = cuda_make_array(l->output, l->outputs*l->batch);
     l->delta_gpu   = cuda_make_array(l->delta,  l->outputs*l->batch);
 #endif
-    
+
 }
 
 void forward_route_layer(const route_layer l, network net)
@@ -106,14 +107,48 @@ void forward_route_layer_gpu(const route_layer l, network net)
 {
     int i, j;
     int offset = 0;
+
+    int min_fl = 100;
+    if (l.post_training_quantization) {
+        if (!net.convx_bias_align) {
+            // align two route layers, fl should choose the minimal
+            for(i = 0; i < l.n; ++i) {
+                int index = l.input_layers[i];
+                int fl = *(net.layers[index].x_fl);
+                if (fl < min_fl) min_fl = fl;
+            }
+        }
+        //printf("min_fl: %d\n", min_fl);
+    }
+
     for(i = 0; i < l.n; ++i){
         int index = l.input_layers[i];
-        float *input = net.layers[index].output_gpu;
+        layer route_l = net.layers[index];
+
+        if (l.post_training_quantization) {
+            if (!net.convx_bias_align) {
+                if (*(route_l.x_fl) > min_fl) {
+                    cuda_pull_array(route_l.output_gpu, route_l.output, route_l.batch*route_l.outputs);
+                    logicShift(route_l.output, route_l.batch*route_l.outputs, min_fl - *(route_l.x_fl));
+                    cuda_push_array(route_l.output_gpu, route_l.output, route_l.batch*route_l.outputs);
+                }
+            }
+        }
+
+        float *input = route_l.output_gpu;
         int input_size = l.input_sizes[i];
         for(j = 0; j < l.batch; ++j){
             copy_gpu(input_size, input + j*input_size, 1, l.output_gpu + offset + j*l.outputs, 1);
         }
         offset += input_size;
+    }
+    if (l.post_training_quantization) {
+        if (!net.convx_bias_align) {
+            *(net.fl) = min_fl;
+        }
+        else {
+            *(net.fl) = *(net.layers[l.input_layers[0]].x_fl);
+        }
     }
 }
 

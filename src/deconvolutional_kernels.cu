@@ -38,7 +38,7 @@ extern "C" void forward_deconvolutional_layer_gpu(layer l, network net)
     } else {
         add_bias_gpu(l.output_gpu, l.biases_gpu, l.batch, l.n, l.out_w*l.out_h);
     }
-    activate_array_gpu(l.output_gpu, l.batch*l.n*l.out_w*l.out_h, l.activation);
+    activate_array_gpu(l.output_gpu, l.batch*l.n*l.out_w*l.out_h, l.activation, 0);
 }
 
 extern "C" void backward_deconvolutional_layer_gpu(layer l, network net)
@@ -46,7 +46,7 @@ extern "C" void backward_deconvolutional_layer_gpu(layer l, network net)
     int i;
 
     //constrain_gpu(l.outputs*l.batch, 1, l.delta_gpu, 1);
-    gradient_array_gpu(l.output_gpu, l.outputs*l.batch, l.activation, l.delta_gpu);
+    gradient_array_gpu(l.output_gpu, l.outputs*l.batch, l.activation, l.delta_gpu, 0);
 
     if(l.batch_normalize){
         backward_batchnorm_layer_gpu(l, net);
