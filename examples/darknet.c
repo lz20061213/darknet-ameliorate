@@ -1,5 +1,4 @@
 #include "darknet.h"
-#include "image.h"
 
 #include <time.h>
 #include <stdlib.h>
@@ -240,14 +239,6 @@ void test_convolutional_layer(char *cfgfile, char *weightfile, char *imagefile)
     backward_network(net);
 }
 
-void test_imread(char* filename) {
-    image a = load_image_cv(filename, 3);
-    int i;
-    for(i = 0; i < 10000; ++i) {
-        //float
-    }
-}
-
 void rescale_net(char *cfgfile, char *weightfile, char *outfile)
 {
     gpu_index = -1;
@@ -472,8 +463,6 @@ int main(int argc, char **argv)
         run_detector(argc, argv);
     } else if (0 == strcmp(argv[1], "test_quantize")) {
         test_convolutional_layer(argv[2], argv[3], argv[4]);
-    } else if (0 == strcmp(argv[1], "test_imread")) {
-        test_imread(argv[2]);
     } else if (0 == strcmp(argv[1], "detect")){
         float thresh = find_float_arg(argc, argv, "-thresh", .5);
         char *filename = (argc > 4) ? argv[4]: 0;

@@ -94,7 +94,7 @@ image load_image_cv(char *filename, int channels)
     int flag = -1;
     if (channels == 0) flag = -1;
     else if (channels == 1) flag = 0;
-    else if (channels == 3) flag = 1;
+    else if (channels == 3) flag = 1; // cv::IMREAD_REDUCED_COLOR_2;
     else {
         fprintf(stderr, "OpenCV can't force load with %d channels\n", channels);
     }

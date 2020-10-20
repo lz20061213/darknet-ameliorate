@@ -2,6 +2,7 @@
 #include "image.h"
 #include "utils.h"
 #include "parser.h"
+#include <assert.h>
 
 static int coco_ids[] = {1,2,3,4,5,6,7,8,9,10,11,13,14,15,16,17,18,19,20,21,22,23,24,25,27,28,31,32,33,34,35,36,37,38,39,40,41,42,43,44,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,67,70,72,73,74,75,76,77,78,79,80,81,82,84,85,86,87,88,89,90};
 
@@ -40,9 +41,22 @@ void train_detector(char *datacfg, char *cfgfile, char *weightfile, int *gpus, i
 #ifdef GPU
         cuda_set_device(gpus[i]);
 #endif
+        //printf("before load_network\n");
         nets[i] = load_network(cfgfile, weightfile, clear);
         nets[i]->learning_rate *= ngpus;
+        //printf("after load_network\n");
     }
+
+    // calculate the weights_frac_bitwiths and biases_frac_bitwidths when use per_channel
+    //printf("before calculate_appr_fracs\n");
+    if (nets[0]->quantize) {
+        if (nets[0]->quantize_per_channel)
+            calculate_appr_fracs(nets, ngpus);
+    }
+    //printf("after calculate_appr_fracs\n");
+
+    //assert(1==2);
+
     srand(time(0));
     network *net = nets[0];
     int last_save = 0;
@@ -1110,7 +1124,7 @@ void validate_detector(char *datacfg, char *cfgfile, char *weightfile, char *out
 void statistic_detector(char *datacfg, char *cfgfile, char *weightfile) {
     int j;
     list *options = read_data_cfg(datacfg);
-    char *valid_images = option_find_str(options, "valid", "data/train.list");
+    char *statistic_images = option_find_str(options, "statistic", "data/train.list");
     char *statistic_fl_path = option_find_str(options, "statistic_fl", "data/statistic_fl.txt");
     char *statistic_features_path = option_find_str(options, "statistic_features", "data/statistic_features.txt");
 
@@ -1122,7 +1136,7 @@ void statistic_detector(char *datacfg, char *cfgfile, char *weightfile) {
     if(net->post_training_quantization) net->write_statistic_fl = 1;
     if(net->quantization_aware_training) net->write_statistic_features = 1;
 
-    list *plist = get_paths(valid_images);
+    list *plist = get_paths(statistic_images);
     char **paths = (char **)list_to_array(plist);
 
     int m = plist->size;
@@ -1144,7 +1158,7 @@ void statistic_detector(char *datacfg, char *cfgfile, char *weightfile) {
 
     // quantize: construct the FILE stream
     if(net->post_training_quantization)  net->filewriter_fl = fopen(statistic_fl_path, "w");
-    if(net->quantization_aware_training) net->filewriter_features = fopen(statistic_features_path, "w");
+    if(!net->quantize || net->quantization_aware_training) net->filewriter_features = fopen(statistic_features_path, "w");
 
     for(t = 0; t < nthreads; ++t){
         args.path = paths[i+t];
@@ -1171,12 +1185,12 @@ void statistic_detector(char *datacfg, char *cfgfile, char *weightfile) {
             char *id = path;  // modify basecfg(path) -> path
             float *X = val_resized[t].data;
             if(net->post_training_quantization) fprintf(net->filewriter_fl, "%s\n", id);
-            if(net->quantization_aware_training) fprintf(net->filewriter_features, "%s\n", id);
+            if(!net->quantize || net->quantization_aware_training) fprintf(net->filewriter_features, "%s\n", id);
             //printf("before predict\n");
             network_predict(net, X);
 
             if(net->post_training_quantization) fprintf(net->filewriter_fl, "\n");
-             if(net->quantization_aware_training) fprintf(net->filewriter_features, "\n");
+            if(!net->quantize || net->quantization_aware_training) fprintf(net->filewriter_features, "\n");
             //printf("after predict\n");
         }
     }

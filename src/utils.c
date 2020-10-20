@@ -810,18 +810,32 @@ void logicShift(float* data, int n, int bit) {
     }
 }
 
-void logicShiftAlign(float* data, int n, int bit) {
+void logicShiftAlign(float* data, int n, int feature_bit, int shift_bit) {
     int i;
     for (i=0; i<n; ++i) {
-        if (bit > 0) {
-            data[i] = (float)(((long long)data[i]) << bit);
-            if (data[i] < -128) data[i] = -128;
-            if (data[i] > 127) data[i] = 127;
+        if (shift_bit > 0) {
+            //data[i] = (float) (((int)((floorf)(data[i]))) << bit);
+            data[i] = (float)(((long long)data[i]) << shift_bit);
+            if (feature_bit == 8) {
+                if (data[i] < -128) data[i] = -128;
+                if (data[i] > 127) data[i] = 127;
+            }
+            else if (feature_bit == 4) {
+                if (data[i] < -8) data[i] = -8;
+                if (data[i] > 7) data[i] = 7;
+            }
             data[i] = (int8_t)(data[i]);
         } else {
-            data[i] = (float)(((long long)data[i]) >> (-bit));
-            if (data[i] < -128) data[i] = -128;
-            if (data[i] > 127) data[i] = 127;
+            //data[i] = (float)(((int)((floorf)(data[i]))) >> (-bit));
+            data[i] = (float)(((long long)data[i]) >> (-shift_bit));
+            if (feature_bit == 8) {
+                if (data[i] < -128) data[i] = -128;
+                if (data[i] > 127) data[i] = 127;
+            }
+            else if (feature_bit == 4) {
+                if (data[i] < -8) data[i] = -8;
+                if (data[i] > 7) data[i] = 7;
+            }
             data[i] = (int8_t)(data[i]);
         }
     }
@@ -843,6 +857,21 @@ void get_max_min(float *data, int n, float* max_data, float* min_data) {
     *min_data = copydata[0];
     free(copydata);
 }
+
+void get_mean_variance(float *data, int n, float *mean, float *variance) {
+    *mean = 0.0;
+    *variance = 0.0;
+    int i;
+    for(i = 0; i < n; ++i) {
+        *mean += data[i];
+    }
+    *mean /= n;
+    for(i = 0; i < n; ++i) {
+        *variance += (data[i] - *mean) * (data[i] - *mean);
+    }
+    *variance /= n;
+}
+
 
 int quantizeOutputs(float* output, int n) {
     int i, fl = 0;

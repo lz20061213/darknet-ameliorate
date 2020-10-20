@@ -179,8 +179,17 @@ struct layer{
     int quantize_bias_fraction_bitwidth;
     int quantize_feature_bitwidth;
     int quantize_feature_fraction_bitwidth;
+
+    int quantize_per_channel;
+    float quantize_per_channel_keep_rate;
+    int *quantize_weight_fraction_bitwidths;
+    int *quantize_bias_fraction_bitwidths;
+
+    //int convx_bias_align;
     int *conv_fl;
+    int *conv_fls;
     int *bias_fl;
+    int *bias_fls;
     int *x_fl;
 
     int reverse;
@@ -631,6 +640,10 @@ typedef struct network{
     int quantize_bias_fraction_bitwidth;
     int quantize_feature_bitwidth;
     int quantize_feature_fraction_bitwidth;
+
+    int quantize_per_channel;
+    float quantize_per_channel_keep_rate;
+
     int quantize_freezeBN;
     int quantize_freezeBN_iterpoint;
     int *fl;

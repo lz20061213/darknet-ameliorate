@@ -55,11 +55,13 @@ float two_way_max(float a, float b);
 
 // for quantize
 void logicShift(float *data, int n, int bit);
-void logicShiftAlign(float *data, int n, int bit);
+void logicShiftAlign(float *data, int n, int feature_bit, int shift_bit);
 void restore(float*data, int n, int bit);
-void get_max_min(float *data, int n, float* max_data, float* min_data);
 int quantizeOutputs(float* output, int n);
 
 void quantize(float *x, int n, int total_bitwidth, int fraction_bitwidth);
+
+void get_max_min(float *data, int n, float* max_data, float* min_data);
+void get_mean_variance(float *data, int n, float *mean, float *variance);
 #endif
 

@@ -576,6 +576,7 @@ void forward_yolo_layer_gpu(const layer l, network net)
     copy_gpu(l.batch*l.inputs, net.input_gpu, 1, l.output_gpu, 1);
 
     if (l.post_training_quantization) {
+        //printf("yolo %d, restore: %d\n", l.current_layer_index, *(net.fl));
         cuda_pull_array(l.output_gpu, l.output, l.batch*l.outputs);
         restore(l.output, l.batch*l.outputs, *(net.fl));
         cuda_push_array(l.output_gpu, l.output, l.batch*l.outputs);
@@ -597,6 +598,16 @@ void forward_yolo_layer_gpu(const layer l, network net)
             activate_array_gpu(l.output_gpu + index, (1+l.classes)*l.w*l.h, LOGISTIC, 0);
         }
     }
+
+    /*
+    cuda_pull_array(l.output_gpu, l.output, l.batch*l.outputs);
+    int t;
+    printf("yolo: %d output: ", l.index);
+    for (t = 0; t < 10; ++t) {
+        printf("%f ", l.output[t]);
+    }
+    printf("\n");
+    */
 
     if(!net.train || l.onlyforward){
         cuda_pull_array(l.output_gpu, l.output, l.batch*l.outputs);

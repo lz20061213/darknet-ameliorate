@@ -96,10 +96,28 @@ extern "C" void forward_maxpool_layer_gpu(maxpool_layer layer, network net)
     forward_maxpool_layer_kernel<<<cuda_gridsize(n), BLOCK>>>(n, layer.h, layer.w, layer.c, layer.stride, layer.size, layer.pad, net.input_gpu, layer.output_gpu, layer.indexes_gpu);
     check_error(cudaPeekAtLastError());
 
+    /*
+    // for test
+    cuda_pull_array(layer.output_gpu, layer.output, layer.batch*layer.outputs);
+    if (layer.post_training_quantization)
+         restore(layer.output, layer.batch*layer.outputs, *(net.fl));
+    int o, p, q;
+    printf("layer %d, maxpool output:\n", layer.current_layer_index);
+    for (o=0; o<2; ++o) {
+        for(p=5; p<10; ++p) {
+            for(q=5; q<10; ++q) {
+                printf("%f ", layer.output[o*h*w+p*w+q]);
+            }
+            printf("\n");
+        }
+    }
+    printf("\n");
+    */
+
     if (net.write_results) {
         cuda_pull_array(layer.output_gpu, layer.output, layer.batch*layer.outputs);
         char buff[50];
-        sprintf(buff, "ship/outputs/maxpool_%02d.dat", layer.current_layer_index);
+        sprintf(buff, "ship/statistics/outputs/maxpool_%02d.dat", layer.current_layer_index);
         FILE *fp;
         fp = fopen(buff, "wb");
         fwrite(layer.output, sizeof(float), layer.batch*layer.outputs, fp);

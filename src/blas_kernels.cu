@@ -252,7 +252,7 @@ void backward_bias_gpu(float *bias_updates, float *delta, int batch, int n, int 
 __global__ void backward_quantize_kernel(float *x_updates, float *x, int n, float bound, float shift) {
     int i = (blockIdx.x + blockIdx.y*gridDim.x) * blockDim.x + threadIdx.x;
     if (i < n) {
-        if (x[i] < -bound || x[i] > bound - (float) 1.0 / shift) x_updates[i] = 0;
+        if (x[i] < -bound || x[i] > bound- (float)1.0 / shift) x_updates[i] = 0;
     }
 }
 
