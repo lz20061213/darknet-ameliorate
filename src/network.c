@@ -805,8 +805,10 @@ float *network_predict(network *net, float *input)
     fuse_conv_batchnorm(net);
 
     if (net->post_training_quantization) {
-        net->fl = calloc(1, sizeof(int));
-        *(net->fl) = 0;
+        if (!net->quantize_per_channel) {
+            net->fl = calloc(1, sizeof(int));
+            *(net->fl) = 0;
+        }
     }
 
     forward_network(net);

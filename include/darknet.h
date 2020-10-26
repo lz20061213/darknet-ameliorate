@@ -647,6 +647,7 @@ typedef struct network{
     int quantize_freezeBN;
     int quantize_freezeBN_iterpoint;
     int *fl;
+    int *fls; // for per channel
     int convx_bias_align;
     // quantize: for keep the fl statistic
     int write_statistic_fl;

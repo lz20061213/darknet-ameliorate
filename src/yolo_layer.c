@@ -578,7 +578,16 @@ void forward_yolo_layer_gpu(const layer l, network net)
     if (l.post_training_quantization) {
         //printf("yolo %d, restore: %d\n", l.current_layer_index, *(net.fl));
         cuda_pull_array(l.output_gpu, l.output, l.batch*l.outputs);
-        restore(l.output, l.batch*l.outputs, *(net.fl));
+        layer pre_l = net.layers[l.current_layer_index - 1];
+        if (pre_l.quantize_per_channel) {
+            int c, spatial_size;
+            spatial_size = l.out_w * l.out_h;
+            for (c = 0; c < l.c; ++c) {
+                restore(l.output + spatial_size * c, spatial_size, pre_l.bias_fls[c]);
+            }
+        } else {
+            restore(l.output, l.batch*l.outputs, *(net.fl));
+        }
         cuda_push_array(l.output_gpu, l.output, l.batch*l.outputs);
     }
 

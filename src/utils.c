@@ -872,7 +872,6 @@ void get_mean_variance(float *data, int n, float *mean, float *variance) {
     *variance /= n;
 }
 
-
 int quantizeOutputs(float* output, int n) {
     int i, fl = 0;
     float max_fl = 0.0;

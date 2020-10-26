@@ -87,6 +87,7 @@ void forward_convolutional_layer_gpu(convolutional_layer l, network net)
     }
 
     if(l.quantize){
+        // CHECK: l.quantization_aware_training
         if (l.quantization_aware_training) {
             /*
             //printf("feature quantize: %d %d\n", l.quantize_feature_bitwidth, l.quantize_feature_fraction_bitwidth);
@@ -259,7 +260,7 @@ void forward_convolutional_layer_gpu(convolutional_layer l, network net)
 
                 /*
                 cuda_pull_array(l.merge_weights_gpu, l.weights, l.nweights);
-                printf("layer %d: quantization weights: %.10f %.10f %.10f %.10f %.10f\n", l.current_layer_index, l.weights[5], l.weights[6], l.weights[7], l.weights[8], l.weights[9]);
+                printf("layer %d quantization weights: %.10f %.10f %.10f %.10f %.10f\n", l.current_layer_index, l.weights[5], l.weights[6], l.weights[7], l.weights[8], l.weights[9]);
                 */
 
     #ifdef CUDNN
@@ -370,11 +371,29 @@ void forward_convolutional_layer_gpu(convolutional_layer l, network net)
                 }
             }
         }
+        // CHECK: l.post_training_quantization
         else
         {
             /*
             cuda_pull_array(net.input_gpu, net.input, l.batch*l.inputs);
-            restore(net.input, l.batch*l.inputs, *(net.fl));
+            if (l.quantize_per_channel) {
+                int j, pre_index = -1;
+                for (j = l.current_layer_index - 1; j >= 0; j--) {
+                    if (net.layers[j].type == CONVOLUTIONAL) {
+                        pre_index = j;
+                        break;
+                    }
+                    if (net.layers[j].type == ROUTE) {
+                        int index = net.layers[j].input_layers[0];
+                        j = index;
+                    }
+                }
+                //printf("pre_index: %d\n", pre_index);
+                if (pre_index >= 0)
+                    restore(net.input, l.batch*l.inputs, *(net.layers[pre_index].x_fl));
+            } else {
+                restore(net.input, l.batch*l.inputs, *(net.fl));
+            }
             int o, p, q;
             printf("layer %d, input:\n", l.current_layer_index);
             for (o=0; o<2; ++o) {
@@ -390,8 +409,19 @@ void forward_convolutional_layer_gpu(convolutional_layer l, network net)
 
             /*
             cuda_pull_array(l.weights_gpu, l.weights, l.nweights);
-            restore(l.weights, l.nweights, *(l.conv_fl));
-            printf("layer %d:  : %.10f %.10f %.10f %.10f %.10f\n", l.current_layer_index, l.weights[5], l.weights[6], l.weights[7], l.weights[8], l.weights[9]);
+            if (l.quantize_per_channel) {
+                int c, spatial_size;
+                spatial_size = l.nweights / l.n;
+                printf("conv_fls: ");
+                for(c = 0; c < l.n; ++c) {
+                    printf("%d ", l.conv_fls[c]);
+                    restore(l.weights + spatial_size * c, spatial_size, l.conv_fls[c]);
+                }
+                printf("\n");
+            } else {
+                restore(l.weights, l.nweights, *(l.conv_fl));
+            }
+            printf("layer %d quantization weights: %.10f %.10f %.10f %.10f %.10f\n", l.current_layer_index, l.weights[5], l.weights[6], l.weights[7], l.weights[8], l.weights[9]);
             */
 
             float one = 1;
@@ -409,11 +439,20 @@ void forward_convolutional_layer_gpu(convolutional_layer l, network net)
                         l.dstTensorDesc,
                         l.output_gpu);
 
-            *(net.fl) += *(l.conv_fl);
+            if (!l.quantize_per_channel)
+                *(net.fl) += *(l.conv_fl);
 
             /*
             cuda_pull_array(l.output_gpu, l.output, l.batch*l.outputs);
-            restore(l.output, l.batch*l.outputs, *(net.fl));
+            if (l.quantize_per_channel) {
+                int c, spatial_size;
+                spatial_size = l.outputs / l.n;
+                for(c = 0; c < l.n; ++c) {
+                    restore(l.output + spatial_size * c, spatial_size, l.bias_fls[c]);
+                }
+            } else {
+                restore(l.output, l.batch*l.outputs, *(net.fl));
+            }
             printf("layer %d, conv output:\n", l.current_layer_index);
             for (o=0; o<2; ++o) {
                 for(p=5; p<10; ++p) {
@@ -449,7 +488,17 @@ void forward_convolutional_layer_gpu(convolutional_layer l, network net)
 
             /*
             cuda_pull_array(l.biases_gpu, l.biases, l.n);
-            restore(l.biases, l.n, *(l.bias_fl));
+            if (l.quantize_per_channel) {
+                int c;
+                printf("bias_fl: ");
+                for(c = 0; c < l.n; ++c) {
+                    printf("%d ", l.bias_fls[c]);
+                    restore(l.biases + c, 1, l.bias_fls[c]);
+                }
+                printf("\n");
+            } else {
+                restore(l.biases, l.n, *(l.bias_fl));
+            }
             printf("layer %d: quantization biases: %f %f %f %f %f\n", l.current_layer_index, l.biases[0], l.biases[1], l.biases[2], l.biases[3], l.biases[4]);
             */
 
@@ -457,7 +506,15 @@ void forward_convolutional_layer_gpu(convolutional_layer l, network net)
 
             /*
             cuda_pull_array(l.output_gpu, l.output, l.batch*l.outputs);
-            restore(l.output, l.batch*l.outputs, *(net.fl));
+            if (l.quantize_per_channel) {
+                int c, spatial_size;
+                spatial_size = l.outputs / l.n;
+                for(c = 0; c < l.n; ++c) {
+                    restore(l.output + spatial_size * c, spatial_size, l.bias_fls[c]);
+                }
+            } else {
+                restore(l.output, l.batch*l.outputs, *(net.fl));
+            }
             printf("layer %d, add bias output:\n", l.current_layer_index);
             for (o=0; o<2; ++o) {
                 for(p=5; p<10; ++p) {
@@ -540,8 +597,17 @@ void forward_convolutional_layer_gpu(convolutional_layer l, network net)
 
     /*
     cuda_pull_array(l.output_gpu, l.output, l.batch*l.outputs);
-    if (l.post_training_quantization)
-        restore(l.output, l.batch*l.outputs, *(net.fl));
+    if (l.post_training_quantization) {
+        if (l.quantize_per_channel) {
+            int c, spatial_size;
+            spatial_size = l.outputs / l.n;
+            for(c = 0; c < l.n; ++c) {
+                restore(l.output + spatial_size * c, spatial_size, l.bias_fls[c]);
+            }
+        } else {
+            restore(l.output, l.batch*l.outputs, *(net.fl));
+        }
+    }
     printf("layer %d, leaky output:\n", l.current_layer_index);
     int o,p,q;
     for (o=0; o<2; ++o) {
@@ -573,15 +639,29 @@ void forward_convolutional_layer_gpu(convolutional_layer l, network net)
                     *(net.fl) += x_fl;
                 }
                 else {
-                    int diff = *(net.fl) - *(l.x_fl);
-                    //printf("convolution: %d, diff %d, fearue_bitwidth: %d\n", l.current_layer_index, diff, l.quantize_feature_bitwidth);
-                    logicShiftAlign(l.output, l.batch*l.outputs, l.quantize_feature_bitwidth, -diff);
-                    *(net.fl) = *(l.x_fl);
+                    if (!l.quantize_per_channel) {
+                        int diff = *(net.fl) - *(l.x_fl);
+                        //printf("convolution: %d, diff %d, fearue_bitwidth: %d\n", l.current_layer_index, diff, l.quantize_feature_bitwidth);
+                        logicShiftAlign(l.output, l.batch*l.outputs, l.quantize_feature_bitwidth, -diff);
+                        *(net.fl) = *(l.x_fl);
+                    } else {
+                        int c, diff, spatial_size;
+                        spatial_size = l.outputs / l.n;
+                        // l.batch = 1
+                        for (c = 0; c < l.n; ++c) {
+                            diff = l.bias_fls[c] - *(l.x_fl);
+                            logicShiftAlign(l.output+spatial_size * c, spatial_size, l.quantize_feature_bitwidth, -diff);
+                        }
+                    }
                 }
                 cuda_push_array(l.output_gpu, l.output, l.batch*l.outputs);
 
                 /*
-                restore(l.output, l.batch*l.outputs, *(net.fl));
+                if (l.quantize_per_channel) {
+                    restore(l.output, l.batch*l.outputs, *(l.x_fl));
+                } else {
+                    restore(l.output, l.batch*l.outputs, *(net.fl));
+                }
                 printf("layer %d, quantize output:\n", l.current_layer_index);
                 for (o=0; o<2; ++o) {
                     for(p=5; p<10; ++p) {
@@ -595,7 +675,8 @@ void forward_convolutional_layer_gpu(convolutional_layer l, network net)
                 */
             }
 
-            *(l.x_fl) = *(net.fl);
+            if (!l.quantize_per_channel)
+                *(l.x_fl) = *(net.fl);
 
             if (net.write_statistic_fl) {
                 char buff[20];
@@ -608,8 +689,19 @@ void forward_convolutional_layer_gpu(convolutional_layer l, network net)
             if (l.quantize_feature) {
                 copy_gpu(l.batch*l.outputs, l.output_gpu, 1, l.quantize_output_gpu, 1);
 
-                quantize_gpu(l.output_gpu, l.batch*l.outputs, l.quantize_feature_bitwidth,
-                        l.quantize_feature_fraction_bitwidth, l.quantize_bias_fraction_bitwidth, 0);
+                if (l.quantize_per_channel) {
+                    int b, c, spatial_size;
+                    spatial_size = l.outputs / l.n;
+                    for (b = 0; b < l.batch; ++b) {
+                        for (c = 0; c < l.n; ++c) {
+                            quantize_gpu(l.output_gpu + l.outputs * b + spatial_size * c, spatial_size,
+                                l.quantize_feature_bitwidth, l.quantize_feature_fraction_bitwidth, l.quantize_bias_fraction_bitwidths[c], 0);
+                        }
+                    }
+                } else {
+                    quantize_gpu(l.output_gpu, l.batch*l.outputs, l.quantize_feature_bitwidth,
+                            l.quantize_feature_fraction_bitwidth, l.quantize_bias_fraction_bitwidth, 0);
+                }
 
                 /*
                 cuda_pull_array(l.output_gpu, l.output, l.batch*l.outputs);

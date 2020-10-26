@@ -51,7 +51,7 @@ void train_detector(char *datacfg, char *cfgfile, char *weightfile, int *gpus, i
     //printf("before calculate_appr_fracs\n");
     if (nets[0]->quantize) {
         if (nets[0]->quantize_per_channel)
-            calculate_appr_fracs(nets, ngpus);
+            calculate_appr_fracs_networks(nets, ngpus);
     }
     //printf("after calculate_appr_fracs\n");
 
@@ -1317,6 +1317,30 @@ float validate_detector_map(char *datacfg, char *cfgfile, char *weightfile, floa
     }
     else {
         net = load_network(cfgfile, weightfile, 0);    // set batch=1
+        if (net->quantize) {
+            if (net->quantization_aware_training) {
+                if (net->quantize_per_channel) {
+                    int i, j;
+                    char *float_weightfile = option_find_str(options, "float_weightfile", "backup/final.weights");
+                    network *float_net = load_network(cfgfile, float_weightfile, 0);
+                    calculate_appr_fracs_network(float_net);
+                    copy_appr_fracs_network(float_net, net);
+                    free_network(float_net);
+                    printf("finish weight and bias fraction bitwidths calculation and copying\n");
+                    /*
+                    for(i = 0; i < net->n; ++i) {
+                        layer *l = &net->layers[i];
+                        if (l->type == CONVOLUTIONAL) {
+                            printf("convolutional %d\n", i);
+                            for (j = 0; j < l->n; ++j) {
+                                printf("channel %d: %d %d\n", j, l->quantize_weight_fraction_bitwidths[j], l->quantize_bias_fraction_bitwidths[j]);
+                            }
+                        }
+                    }
+                    */
+                }
+            }
+        }
         //set_batch_network(&net, 1);
         fuse_conv_batchnorm(net);
         //calculate_binary_weights(net);
@@ -1756,7 +1780,35 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
     char **names = get_labels(name_list);
 
     image **alphabet = load_alphabet();
+
     network *net = load_network(cfgfile, weightfile, 0);
+
+    if (net->quantize) {
+        if (net->quantization_aware_training) {
+            if (net->quantize_per_channel) {
+                int i, j;
+                char *float_weightfile = option_find_str(options, "float_weightfile", "backup/final.weights");
+                network *float_net = load_network(cfgfile, float_weightfile, 0);
+                calculate_appr_fracs_network(float_net);
+                copy_appr_fracs_network(float_net, net);
+                free_network(float_net);
+                printf("finish weight and bias fraction bitwidths calculation and copying\n");
+                /*
+                for(i = 0; i < net->n; ++i) {
+                    layer *l = &net->layers[i];
+                    if (l->type == CONVOLUTIONAL) {
+                        printf("convolutional %d\n", i);
+                        for (j = 0; j < l->n; ++j) {
+                            printf("channel %d: %d %d\n", j, l->quantize_weight_fraction_bitwidths[j], l->quantize_bias_fraction_bitwidths[j]);
+                        }
+                    }
+                }
+                */
+            }
+        }
+    }
+
+
     set_batch_network(net, 1);
     srand(2222222);
     double time;

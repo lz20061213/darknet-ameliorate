@@ -147,7 +147,8 @@ void forward_route_layer_gpu(const route_layer l, network net)
             *(net.fl) = min_fl;
         }
         else {
-            *(net.fl) = *(net.layers[l.input_layers[0]].x_fl);
+            if (!l.quantize_per_channel)
+                *(net.fl) = *(net.layers[l.input_layers[0]].x_fl);
         }
     }
 }

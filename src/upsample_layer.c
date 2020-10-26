@@ -93,7 +93,10 @@ void forward_upsample_layer_gpu(const layer l, network net)
     }else{
         upsample_gpu(net.input_gpu, l.w, l.h, l.c, l.batch, l.stride, 1, l.scale, l.output_gpu);
     }
-    if (l.post_training_quantization) *(l.x_fl) = *(net.fl);
+    if (l.post_training_quantization) {
+        if (!l.quantize_per_channel)
+            *(l.x_fl) = *(net.fl);
+    }
 }
 
 void backward_upsample_layer_gpu(const layer l, network net)
