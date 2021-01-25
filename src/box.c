@@ -104,6 +104,40 @@ void do_nms_sort(detection *dets, int total, int classes, float thresh)
     }
 }
 
+void do_nms_sort_with_keypoints(detection_with_keypoints *dets, int total, int classes, float thresh)
+{
+    int i, j, k;
+    k = total-1;
+    for(i = 0; i <= k; ++i){
+        if(dets[i].objectness == 0){
+            detection_with_keypoints swap = dets[i];
+            dets[i] = dets[k];
+            dets[k] = swap;
+            --k;
+            --i;
+        }
+    }
+    total = k+1;
+
+    for(k = 0; k < classes; ++k){
+        for(i = 0; i < total; ++i){
+            dets[i].sort_class = k;
+        }
+        qsort(dets, total, sizeof(detection_with_keypoints), nms_comparator);
+        for(i = 0; i < total; ++i){
+            if(dets[i].prob[k] == 0) continue;
+            box_with_keypoints a = dets[i].bkps;
+            for(j = i+1; j < total; ++j){
+                box_with_keypoints b = dets[j].bkps;
+                if (box_with_keypoints_iou(a, b) > thresh){
+                    dets[j].prob[k] = 0;
+                }
+            }
+        }
+    }
+}
+
+
 box float_to_box(float *f, int stride)
 {
     box b = {0};
@@ -112,6 +146,24 @@ box float_to_box(float *f, int stride)
     b.w = f[2*stride];
     b.h = f[3*stride];
     return b;
+}
+
+box_with_keypoints float_to_box_with_keypoints(float *f, int stride, int keypoints_num)
+{
+    box_with_keypoints bkps;
+    int k;
+    bkps.x = f[0];
+    bkps.y = f[1*stride];
+    bkps.w = f[2*stride];
+    bkps.h = f[3*stride];
+    bkps.keypoints_num = keypoints_num;
+    bkps.kps = calloc(keypoints_num, sizeof(keypoint));
+    for (k = 0; k < keypoints_num; ++k) {
+        bkps.kps[k].v = f[(4+3*k)*stride];
+        bkps.kps[k].x = f[(4+3*k+1)*stride];
+        bkps.kps[k].y = f[(4+3*k+2)*stride];
+    }
+    return bkps;
 }
 
 dbox derivative(box a, box b)
@@ -232,6 +284,22 @@ float box_iou(box a, box b)
     return inter_area / union_area;
 }
 
+box box_with_keypoints2box(box_with_keypoints a) {
+    box b;
+    b.x = a.x;
+    b.y = a.y;
+    b.w = a.w;
+    b.h = a.h;
+    return b;
+}
+
+float box_with_keypoints_iou(box_with_keypoints a, box_with_keypoints b)
+{
+    box c = box_with_keypoints2box(a);
+    box d = box_with_keypoints2box(b);
+    return box_iou(c, d);
+}
+
 float box_giou(box a, box b) {
     boxabs ba = box_c(a, b);
     float w = ba.right - ba.left;
@@ -244,6 +312,13 @@ float box_giou(box a, box b) {
     float u = box_union(a, b);
     float giou_term = (c - u) / c;
     return iou - giou_term;
+}
+
+float box_with_keypoints_giou(box_with_keypoints a, box_with_keypoints b)
+{
+    box c = box_with_keypoints2box(a);
+    box d = box_with_keypoints2box(b);
+    return box_giou(c, d);
 }
 
 // https://github.com/Zzh-tju/DIoU-darknet
@@ -264,8 +339,33 @@ float box_diou(box a, box b)
     return iou - diou_term;
 }
 
+float box_with_keypoints_diou(box_with_keypoints a, box_with_keypoints b)
+{
+    box c = box_with_keypoints2box(a);
+    box d = box_with_keypoints2box(b);
+    return box_diou(c, d);
+}
+
 float box_diounms(box a, box b, float beta1)
 {
+    boxabs ba = box_c(a, b);
+    float w = ba.right - ba.left;
+    float h = ba.bot - ba.top;
+    float c = w * w + h * h;
+    float iou = box_iou(a, b);
+    if (c == 0) {
+        return iou;
+    }
+    float d = (a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y);
+    float u = pow(d / c, beta1);
+    float diou_term = u;
+    return iou - diou_term;
+}
+
+float box_with_keypoints_diounms(box_with_keypoints bkpsa, box_with_keypoints bkpsb, float beta1)
+{
+    box a = box_with_keypoints2box(bkpsa);
+    box b = box_with_keypoints2box(bkpsb);
     boxabs ba = box_c(a, b);
     float w = ba.right - ba.left;
     float h = ba.bot - ba.top;
@@ -300,6 +400,13 @@ float box_ciou(box a, box b)
     float alpha = ar_loss / (1 - iou + ar_loss + 0.000001);
     float ciou_term = d + alpha * ar_loss;                   //ciou
     return iou - ciou_term;
+}
+
+float box_with_keypoints_ciou(box_with_keypoints a, box_with_keypoints b)
+{
+    box c = box_with_keypoints2box(a);
+    box d = box_with_keypoints2box(b);
+    return box_ciou(c, d);
 }
 
 float box_iou_kind(box a, box b, IOU_LOSS iou_kind) {
@@ -629,6 +736,13 @@ dxrep dx_box_iou(box pred, box truth, IOU_LOSS iou_loss) {
     return ddx;
 }
 
+dxrep dx_box_with_keypoints_iou(box_with_keypoints pred, box_with_keypoints truth, IOU_LOSS iou_loss)
+{
+    box a = box_with_keypoints2box(pred);
+    box b = box_with_keypoints2box(truth);
+    return dx_box_iou(a, b, iou_loss);
+}
+
 // https://github.com/Zzh-tju/DIoU-darknet
 // https://arxiv.org/abs/1911.08287
 void diounms_sort(detection *dets, int total, int classes, float thresh, NMS_KIND nms_kind, float beta1)
@@ -695,6 +809,70 @@ void diounms_sort(detection *dets, int total, int classes, float thresh, NMS_KIN
     }
 }
 
+void diounms_sort_with_keypoints(detection_with_keypoints *dets, int total, int classes, float thresh, NMS_KIND nms_kind, float beta1)
+{
+    int i, j, k;
+    k = total - 1;
+    for (i = 0; i <= k; ++i) {
+        if (dets[i].objectness == 0) {
+            detection_with_keypoints swap = dets[i];
+            dets[i] = dets[k];
+            dets[k] = swap;
+            --k;
+            --i;
+        }
+    }
+    total = k + 1;
+
+    for (k = 0; k < classes; ++k) {
+        for (i = 0; i < total; ++i) {
+            dets[i].sort_class = k;
+        }
+        qsort(dets, total, sizeof(detection_with_keypoints), nms_comparator_v3);
+        for (i = 0; i < total; ++i)
+        {
+            if (dets[i].prob[k] == 0) continue;
+            box_with_keypoints a = dets[i].bkps;
+            for (j = i + 1; j < total; ++j) {
+                box_with_keypoints b = dets[j].bkps;
+                if (box_with_keypoints_iou(a, b) > thresh && nms_kind == CORNERS_NMS)
+                {
+                    float sum_prob = pow(dets[i].prob[k], 2) + pow(dets[j].prob[k], 2);
+                    float alpha_prob = pow(dets[i].prob[k], 2) / sum_prob;
+                    float beta_prob = pow(dets[j].prob[k], 2) / sum_prob;
+                    //dets[i].bbox.x = (dets[i].bbox.x*alpha_prob + dets[j].bbox.x*beta_prob);
+                    //dets[i].bbox.y = (dets[i].bbox.y*alpha_prob + dets[j].bbox.y*beta_prob);
+                    //dets[i].bbox.w = (dets[i].bbox.w*alpha_prob + dets[j].bbox.w*beta_prob);
+                    //dets[i].bbox.h = (dets[i].bbox.h*alpha_prob + dets[j].bbox.h*beta_prob);
+                    /*
+                    if (dets[j].points == YOLO_CENTER && (dets[i].points & dets[j].points) == 0) {
+                        dets[i].bbox.x = (dets[i].bbox.x*alpha_prob + dets[j].bbox.x*beta_prob);
+                        dets[i].bbox.y = (dets[i].bbox.y*alpha_prob + dets[j].bbox.y*beta_prob);
+                    }
+                    else if ((dets[i].points & dets[j].points) == 0) {
+                        dets[i].bbox.w = (dets[i].bbox.w*alpha_prob + dets[j].bbox.w*beta_prob);
+                        dets[i].bbox.h = (dets[i].bbox.h*alpha_prob + dets[j].bbox.h*beta_prob);
+                    }
+                    dets[i].points |= dets[j].points;
+                    */
+                    dets[j].prob[k] = 0;
+                }
+                else if (box_with_keypoints_iou(a, b) > thresh && nms_kind == GREEDY_NMS) {
+                    dets[j].prob[k] = 0;
+                }
+                else {
+                    if (box_with_keypoints_diounms(a, b, beta1) > thresh && nms_kind == DIOU_NMS) {
+                        dets[j].prob[k] = 0;
+                    }
+                }
+            }
+
+            //if ((nms_kind == CORNERS_NMS) && (dets[i].points != (YOLO_CENTER | YOLO_LEFT_TOP | YOLO_RIGHT_BOTTOM)))
+            //    dets[i].prob[k] = 0;
+        }
+    }
+}
+
 float box_lb_dis(box a, box b)
 {
     float lb_ax = a.x - a.w / 2.0;
@@ -702,6 +880,13 @@ float box_lb_dis(box a, box b)
     float lb_bx = b.x - b.w / 2.0;
     float lb_by = b.y + b.h / 2.0;
     return sqrt((lb_ax - lb_bx)*(lb_ax - lb_bx) + (lb_ay - lb_by)*(lb_ay - lb_by));
+}
+
+float box_with_keypoints_lb_dis(box_with_keypoints a, box_with_keypoints b)
+{
+     box c = box_with_keypoints2box(a);
+     box d = box_with_keypoints2box(b);
+     return box_lb_dis(c, d);
 }
 
 float box_rmse(box a, box b)

@@ -28,6 +28,8 @@
 #include "parser.h"
 #include "region_layer.h"
 #include "yolo_layer.h"
+#include "keypoint_yolo_layer.h"
+#include "heatmap_layer.h"
 #include "distill_yolo_layer.h"
 #include "mutual_yolo_layer.h"
 #include "mimicutual_yolo_layer.h"
@@ -62,6 +64,8 @@ LAYER_TYPE string_to_layer_type(char * type)
     if (strcmp(type, "[detection]")==0) return DETECTION;
     if (strcmp(type, "[region]")==0) return REGION;
     if (strcmp(type, "[yolo]")==0) return YOLO;
+    if (strcmp(type, "[keypoint_yolo]")==0) return KEYPOINT_YOLO;
+    if (strcmp(type, "[heatmap]")==0) return HEATMAP;
     if (strcmp(type, "[distill_yolo]")==0) return DISTILL_YOLO;
     if (strcmp(type, "[mutual_yolo]")==0) return MUTUAL_YOLO;
     if (strcmp(type, "[mimicutual_yolo]")==0) return MIMICUTUAL_YOLO;
@@ -454,6 +458,91 @@ layer parse_yolo(list *options, size_params params, network *net)
     return l;
 }
 
+layer parse_keypoint_yolo(list *options, size_params params, network *net)
+{
+    int classes = option_find_int(options, "classes", 20);
+    int total = option_find_int(options, "num", 1);
+    int num = total;
+
+    char *a = option_find_str(options, "mask", 0);
+    int *mask = parse_yolo_mask(a, &num);
+
+    int keypoints_num = option_find_int(options, "keypoints_num", 5);
+    layer l = make_keypoint_yolo_layer(params.batch, params.w, params.h, num, total, mask, classes, keypoints_num);
+    assert(l.outputs == params.inputs);
+
+    l.max_boxes = option_find_int_quiet(options, "max",90);
+    l.jitter = option_find_float(options, "jitter", .2);
+
+    l.ignore_thresh = option_find_float(options, "ignore_thresh", .5);
+    l.truth_thresh = option_find_float(options, "truth_thresh", 1);
+    l.random = option_find_int_quiet(options, "random", 0);
+    l.rescore = option_find_int_quiet(options, "rescore", 0);
+    l.lb_dis_max_thresh = option_find_float_quiet(options, "lb_dis_max_thresh", 10);
+    l.lb_dis_ignore_thresh = option_find_float_quiet(options, "lb_dis_ignore_thresh", 5);
+    l.lb_dis_truth_thresh = option_find_float_quiet(options, "lb_dis_truth_thresh", 0);
+    l.scale_xy = option_find_float_quiet(options, "scale_xy", 1);
+    l.use_center_regression = option_find_int(options, "use_center_regression", 0);
+    l.object_focal_loss = option_find_int(options, "object_focal_loss", 0);
+
+    l.iou_normalizer = option_find_float_quiet(options, "iou_normalizer", 1);
+    l.cls_normalizer = option_find_float_quiet(options, "cls_normalizer", 1);
+
+    l.label_smooth_rate = option_find_float_quiet(options, "label_smooth_rate", 0);
+
+    l.quantize =  option_find_int_quiet(options, "quantize", net->quantize);
+    l.post_training_quantization = option_find_int_quiet(options, "post_training_quantization", net->post_training_quantization);
+    l.quantization_aware_training = option_find_int_quiet(options, "quantization_aware_training", net->quantization_aware_training);
+
+    char *iou_loss = option_find_str_quiet(options, "iou_loss", "mse");   //
+    if (strcmp(iou_loss, "mse") == 0) l.iou_loss = MSE;
+    else if (strcmp(iou_loss, "giou") == 0) l.iou_loss = GIOU;
+    else if (strcmp(iou_loss, "diou") == 0) l.iou_loss = DIOU;
+    else if (strcmp(iou_loss, "ciou") == 0) l.iou_loss = CIOU;
+    else l.iou_loss = IOU;
+
+    char *iou_thresh_kind_str = option_find_str_quiet(options, "iou_thresh_kind", "iou");
+    if (strcmp(iou_thresh_kind_str, "iou") == 0) l.iou_thresh_kind = IOU;
+    else if (strcmp(iou_thresh_kind_str, "giou") == 0) l.iou_thresh_kind = GIOU;
+    else if (strcmp(iou_thresh_kind_str, "diou") == 0) l.iou_thresh_kind = DIOU;
+    else if (strcmp(iou_thresh_kind_str, "ciou") == 0) l.iou_thresh_kind = CIOU;
+    else {
+        fprintf(stderr, " Wrong iou_thresh_kind = %s \n", iou_thresh_kind_str);
+        l.iou_thresh_kind = IOU;
+    }
+
+    l.beta_nms = option_find_float_quiet(options, "beta_nms", 0.6);
+    char *nms_kind = option_find_str_quiet(options, "nms_kind", "default");
+    if (strcmp(nms_kind, "default") == 0) l.nms_kind = DEFAULT_NMS;
+    else {
+        if (strcmp(nms_kind, "greedynms") == 0) l.nms_kind = GREEDY_NMS;
+        else if (strcmp(nms_kind, "diounms") == 0) l.nms_kind = DIOU_NMS;
+        else l.nms_kind = DEFAULT_NMS;
+        printf("nms_kind: %s (%d), beta = %f \n", nms_kind, l.nms_kind, l.beta_nms);
+    }
+
+    l.atss =  option_find_int_quiet(options, "atss", 0);
+
+    char *map_file = option_find_str(options, "map", 0);
+    if (map_file) l.map = read_map(map_file);
+
+    a = option_find_str(options, "anchors", 0);
+    if(a){
+        int len = strlen(a);
+        int n = 1;
+        int i;
+        for(i = 0; i < len; ++i){
+            if (a[i] == ',') ++n;
+        }
+        for(i = 0; i < n; ++i){
+            float bias = atof(a);
+            l.biases[i] = bias;
+            a = strchr(a, ',')+1;
+        }
+    }
+    return l;
+}
+
 layer parse_distill_yolo(list *options, size_params params) {
     int classes = option_find_int(options, "classes", 20);
     int total = option_find_int(options, "num", 1);
@@ -724,6 +813,18 @@ layer parse_double_yolo(list *options, size_params params)
         }
     }
 
+    return l;
+}
+
+layer parse_heatmap(list *options, size_params params)
+{
+    int keypoints_num = option_find_int(options, "keypoints_num", 5);
+    layer l = make_heatmap_layer(params.batch, params.w, params.h, keypoints_num);
+    assert(l.outputs == params.inputs);
+    l.max_boxes = option_find_int_quiet(options, "max", 90);
+    l.truths = l.max_boxes * (4 + keypoints_num * 3 + 1);
+    l.alpha = option_find_float_quiet(options, "alpha", 2);
+    l.beta = option_find_float_quiet(options, "beta", 4);
     return l;
 }
 
@@ -1399,6 +1500,8 @@ network *parse_network_cfg(char *filename)
             l = parse_region(options, params);
         }else if(lt == YOLO){
             l = parse_yolo(options, params, net);
+        }else if(lt == KEYPOINT_YOLO){
+            l = parse_keypoint_yolo(options, params, net);
         }else if(lt == DISTILL_YOLO) {
             l = parse_distill_yolo(options, params);
         }else if(lt == MUTUAL_YOLO) {
@@ -1407,6 +1510,8 @@ network *parse_network_cfg(char *filename)
             l = parse_mimicutual_yolo(options, params);
         }else if(lt == DOUBLE_YOLO) {
             l = parse_double_yolo(options, params);
+        }else if(lt == HEATMAP) {
+            l = parse_heatmap(options, params);
         }else if(lt == ISEG){
             l = parse_iseg(options, params);
         }else if(lt == DETECTION){

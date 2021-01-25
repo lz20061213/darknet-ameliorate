@@ -177,6 +177,52 @@ box_label *read_boxes(char *filename, int *n)
     return boxes;
 }
 
+keypoint_label *read_boxes_with_keypoints(char *filename, int *n, int keypoints_num)
+{
+    FILE *file = fopen(filename, "r");
+    if(!file) file_error(filename);
+    float x, y, h, w, vis, kpx, kpy;
+    int id;
+    int i;
+    int count = 0;
+    int size = 64;
+    keypoint_label *keypoints = calloc(size, sizeof(keypoint_label));
+    //printf("read %s\n", filename);
+    while(fscanf(file, "%d %f %f %f %f", &id, &x, &y, &w, &h) == 5){
+        if(count == size) {
+            size = size * 2;
+            keypoints = realloc(keypoints, size*sizeof(keypoint_label));
+        }
+        // for bounding box
+        keypoints[count].id = id;
+        keypoints[count].x = x;
+        keypoints[count].y = y;
+        keypoints[count].h = h;
+        keypoints[count].w = w;
+        //printf("x, y, w, h: %.2f, %.2f, %.2f, %.2f\n", x, y, w, h);
+        keypoints[count].left   = x - w/2;
+        keypoints[count].right  = x + w/2;
+        keypoints[count].top    = y - h/2;
+        keypoints[count].bottom = y + h/2;
+        // for keypoints
+        keypoints[count].keypoints_num = keypoints_num;
+        keypoints[count].kps = calloc(keypoints_num, sizeof(keypoint));
+        //printf("keypoints_num: %d\n", keypoints_num);
+        for (i=0; i < keypoints_num; ++i) {
+            if (fscanf(file, "%f %f %f", &vis, &kpx, &kpy) == 3) {
+                //printf("vis, kpx, kpy: %.2f, %.2f, %.2f\n", vis, kpx, kpy);
+                keypoints[count].kps[i].v = vis;
+                keypoints[count].kps[i].x = kpx;
+                keypoints[count].kps[i].y = kpy;
+            }
+        }
+        ++count;
+    }
+    fclose(file);
+    *n = count;
+    return keypoints;
+}
+
 void randomize_boxes(box_label *b, int n)
 {
     int i;
@@ -185,6 +231,17 @@ void randomize_boxes(box_label *b, int n)
         int index = rand()%n;
         b[i] = b[index];
         b[index] = swap;
+    }
+}
+
+void randomize_keypoints(keypoint_label *k, int n)
+{
+    int i;
+    for(i = 0; i < n; ++i){
+        keypoint_label swap = k[i];
+        int index = rand()%n;
+        k[i] = k[index];
+        k[index] = swap;
     }
 }
 
@@ -223,6 +280,67 @@ void correct_boxes(box_label *boxes, int n, float dx, float dy, float sx, float 
 
         boxes[i].w = constrain(0, 1, boxes[i].w);
         boxes[i].h = constrain(0, 1, boxes[i].h);
+    }
+}
+
+void correct_keypoints(keypoint_label *keypoints, int n, float dx, float dy, float sx, float sy, int flip) {
+    int i, j;
+    for(i = 0; i < n; ++i){
+        if(keypoints[i].x == 0 && keypoints[i].y == 0) {
+            keypoints[i].x = 999999;
+            keypoints[i].y = 999999;
+            keypoints[i].w = 999999;
+            keypoints[i].h = 999999;
+            continue;
+        }
+
+        keypoints[i].left   = keypoints[i].left  * sx - dx;
+        keypoints[i].right  = keypoints[i].right * sx - dx;
+        keypoints[i].top    = keypoints[i].top   * sy - dy;
+        keypoints[i].bottom = keypoints[i].bottom* sy - dy;
+
+        for(j = 0; j < keypoints[i].keypoints_num; ++j) {
+            if ((int)(keypoints[i].kps[j].v)) {
+                keypoints[i].kps[j].x = keypoints[i].kps[j].x * sx - dx;
+                keypoints[i].kps[j].y = keypoints[i].kps[j].y * sy - dy;
+            }
+        }
+
+        if(flip){
+            float swap = keypoints[i].left;
+            keypoints[i].left = 1. - keypoints[i].right;
+            keypoints[i].right = 1. - swap;
+            for (j = 0; j < keypoints[i].keypoints_num; ++j) {
+                if ((int)(keypoints[i].kps[j].v))
+                    keypoints[i].kps[j].x = 1 - keypoints[i].kps[j].x;
+            }
+        }
+
+        keypoints[i].left =  constrain(0, 1, keypoints[i].left);
+        keypoints[i].right = constrain(0, 1, keypoints[i].right);
+        keypoints[i].top =   constrain(0, 1, keypoints[i].top);
+        keypoints[i].bottom =   constrain(0, 1, keypoints[i].bottom);
+
+        keypoints[i].x = (keypoints[i].left+keypoints[i].right)/2;
+        keypoints[i].y = (keypoints[i].top+keypoints[i].bottom)/2;
+        keypoints[i].w = (keypoints[i].right - keypoints[i].left);
+        keypoints[i].h = (keypoints[i].bottom - keypoints[i].top);
+
+        keypoints[i].w = constrain(0, 1, keypoints[i].w);
+        keypoints[i].h = constrain(0, 1, keypoints[i].h);
+
+        // constrain kps
+        for (j = 0; j <  keypoints[i].keypoints_num; ++j) {
+            if ((int)(keypoints[i].kps[j].v)) {
+                if (keypoints[i].kps[j].x < 0 || keypoints[i].kps[j].x > 1 || keypoints[i].kps[j].y < 0
+                    || keypoints[i].kps[j].y > 1) {
+                    keypoints[i].kps[j].v = 0;
+                    keypoints[i].kps[j].x = 0;
+                    keypoints[i].kps[j].y = 0;
+                }
+            }
+        }
+
     }
 }
 
@@ -298,6 +416,112 @@ box_label *correct_boxes_with_thresh(box_label *boxes, int *n, float dx, float d
     free(boxes);
 
     return filter_boxes;
+}
+
+keypoint_label *correct_keypoints_with_thresh(keypoint_label *keypoints, int *n, float dx, float dy, float sx, float sy, int flip, float thresh) {
+    int i, j, k;
+    int* out_of_thresh = calloc(*n, sizeof(int));
+    int count = *n;
+    for(i = 0; i < *n; ++i){
+        if(keypoints[i].x == 0 && keypoints[i].y == 0) {
+            keypoints[i].x = 999999;
+            keypoints[i].y = 999999;
+            keypoints[i].w = 999999;
+            keypoints[i].h = 999999;
+            continue;
+        }
+
+        keypoints[i].left   = keypoints[i].left  * sx - dx;
+        keypoints[i].right  = keypoints[i].right * sx - dx;
+        keypoints[i].top    = keypoints[i].top   * sy - dy;
+        keypoints[i].bottom = keypoints[i].bottom* sy - dy;
+
+        for(j = 0; j < keypoints[i].keypoints_num; ++j) {
+            if (keypoints[i].kps[j].v) {
+                keypoints[i].kps[j].x = keypoints[i].kps[j].x * sx - dx;
+                keypoints[i].kps[j].y = keypoints[i].kps[j].y * sy - dy;
+            }
+        }
+
+        float ori_area = (keypoints[i].bottom - keypoints[i].top) * (keypoints[i].right - keypoints[i].left);
+
+        if(flip){
+            float swap = keypoints[i].left;
+            keypoints[i].left = 1. - keypoints[i].right;
+            keypoints[i].right = 1. - swap;
+            for (j = 0; j < keypoints[i].keypoints_num; ++j) {
+                if (keypoints[i].kps[j].v)
+                    keypoints[i].kps[j].x = 1 - keypoints[i].kps[j].x;
+            }
+        }
+
+        keypoints[i].left =  constrain(0, 1, keypoints[i].left);
+        keypoints[i].right = constrain(0, 1, keypoints[i].right);
+        keypoints[i].top =   constrain(0, 1, keypoints[i].top);
+        keypoints[i].bottom =   constrain(0, 1, keypoints[i].bottom);
+
+        keypoints[i].x = (keypoints[i].left+keypoints[i].right)/2;
+        keypoints[i].y = (keypoints[i].top+keypoints[i].bottom)/2;
+        keypoints[i].w = (keypoints[i].right - keypoints[i].left);
+        keypoints[i].h = (keypoints[i].bottom - keypoints[i].top);
+
+        keypoints[i].w = constrain(0, 1, keypoints[i].w);
+        keypoints[i].h = constrain(0, 1, keypoints[i].h);
+
+        // constrain kps
+        for (j = 0; j <  keypoints[i].keypoints_num; ++j) {
+            if (keypoints[i].kps[j].v) {
+                if (keypoints[i].kps[j].x < 0 || keypoints[i].kps[j].x > 1 || keypoints[i].kps[j].y < 0
+                    || keypoints[i].kps[j].y > 1) {
+                    keypoints[i].kps[j].v = 0;
+                    keypoints[i].kps[j].x = 0;
+                    keypoints[i].kps[j].y = 0;
+                }
+            }
+        }
+
+        float cor_area = keypoints[i].w * keypoints[i].h;
+
+        if (cor_area / ori_area < thresh) {
+            out_of_thresh[i] = 1;
+            //printf("%f and %f: check filter the correct_box\n", cor_area/ori_area, thresh);
+            count--;
+        }
+    }
+
+    // get new keypoints
+    keypoint_label *filter_keypoints = calloc(count, sizeof(keypoint_label));
+    j = 0;
+    for(i = 0; i < *n; ++i) {
+        if (out_of_thresh[i]) continue;
+        filter_keypoints[j].id = keypoints[i].id;
+        filter_keypoints[j].x = keypoints[i].x;
+        filter_keypoints[j].y = keypoints[i].y;
+        filter_keypoints[j].w = keypoints[i].w;
+        filter_keypoints[j].h = keypoints[i].h;
+        filter_keypoints[j].left= keypoints[i].left;
+        filter_keypoints[j].right = keypoints[i].right;
+        filter_keypoints[j].top = keypoints[i].top;
+        filter_keypoints[j].bottom = keypoints[i].bottom;
+        filter_keypoints[j].kps = calloc(keypoints[i].keypoints_num, sizeof(keypoint));
+        for (k = 0; k < keypoints[i].keypoints_num; ++k) {
+            filter_keypoints[j].kps[k].v = keypoints[i].kps[k].v;
+            filter_keypoints[j].kps[k].x = keypoints[i].kps[k].x;
+            filter_keypoints[j].kps[k].y = keypoints[i].kps[k].y;
+        }
+        j++;
+    }
+
+    *n = count;
+
+    free(out_of_thresh);
+    // free keypoints
+    for (i = 0; i < *n; ++i) {
+        free(keypoints[i].kps);
+    }
+    free(keypoints);
+
+    return filter_keypoints;
 }
 
 void fill_truth_swag(char *path, float *truth, int classes, int flip, float dx, float dy, float sx, float sy)
@@ -583,6 +807,80 @@ void fill_truth_detection(char *path, int num_boxes, float *truth, int classes, 
 //    for (i = 0; i < final_num; ++i) {
 //        printf("data in 493: %f %f %f %f\n", truth[i*5+0], truth[i*5+1], truth[i*5+2], truth[i*5+3]);
 //    }
+}
+
+void fill_truth_keypoint_detection(char *path, int num_boxes, int keypoints_num, float *truth, int classes, int flip, float dx, float dy, float sx, float sy, float filter_thresh)
+{
+    char labelpath[4096];
+    find_replace(path, "images", "labels", labelpath);
+    find_replace(labelpath, "ImageSets", "Annotations", labelpath);
+    find_replace(labelpath, "JPEGImages", "labels", labelpath);
+
+    find_replace(labelpath, "raw", "labels", labelpath);
+    find_replace(labelpath, ".jpg", ".txt", labelpath);
+    find_replace(labelpath, ".png", ".txt", labelpath);
+    find_replace(labelpath, ".JPG", ".txt", labelpath);
+    find_replace(labelpath, ".JPEG", ".txt", labelpath);
+    int count = 0;
+    keypoint_label *keypoints = read_boxes_with_keypoints(labelpath, &count, keypoints_num);
+    randomize_keypoints(keypoints, count);
+    if (filter_thresh > 0.01) {
+        keypoints = correct_keypoints_with_thresh(keypoints, &count, dx, dy, sx, sy, flip, filter_thresh);
+    } else {
+        correct_keypoints(keypoints, count, dx, dy, sx, sy, flip);
+    }
+    if(count > num_boxes) count = num_boxes;
+    float x,y,w,h;
+    int id;
+    int i, j, n;
+    int sub = 0;
+
+    //int final_num = 0;
+    n = 4 + 3 * keypoints_num + 1;
+
+    for (i = 0; i < count; ++i) {
+        x =  keypoints[i].x;
+        y =  keypoints[i].y;
+        w =  keypoints[i].w;
+        h =  keypoints[i].h;
+        id = keypoints[i].id;
+
+        if ((w < .001 || h < .001)) {
+            ++sub;
+            continue;
+        }
+
+        truth[(i-sub)*n+0] = x;
+        truth[(i-sub)*n+1] = y;
+        truth[(i-sub)*n+2] = w;
+        truth[(i-sub)*n+3] = h;
+        for (j = 0; j < keypoints[i].keypoints_num; ++j) {
+             truth[(i-sub)*n + 4 + j*3 + 0] = keypoints[i].kps[j].v;
+             truth[(i-sub)*n + 4 + j*3 + 1] = keypoints[i].kps[j].x;
+             truth[(i-sub)*n + 4 + j*3 + 2] = keypoints[i].kps[j].y;
+        }
+        //final_num++;
+        // id for last
+        truth[(i-sub)*n+n-1] = id;
+    }
+    for (i = 0; i < count; ++i) {
+        free(keypoints[i].kps);
+    }
+    free(keypoints);
+
+    /*
+    printf("data.c in 869\n");
+    for (i = 0; i < final_num; ++i) {
+        float *keypoint = truth + i * n;
+        printf("x, y, w, h: %.2f, %.2f, %.2f, %.2f\n", keypoint[0], keypoint[1], keypoint[2], keypoint[3]);
+        for (j = 0; j < keypoints_num; ++j) {
+            float vis = keypoint[4 + j * 3 + 0];
+            float kpx = keypoint[4 + j * 3 + 1];
+            float kpy = keypoint[4 + j * 3 + 2];
+            printf("vis, kpx, kpy: %.2f, %.2f, %.2f\n", vis, kpx, kpy);
+        }
+    }
+    */
 }
 
 #define NUMCHARS 37
@@ -1420,6 +1718,296 @@ data load_data_detection(int n, char **paths, int m, int w, int h, int boxes, in
             }
         }
     }
+
+    // free
+    free(random_paths);
+    return d;
+}
+
+
+// original-data-augmentation
+data single_keypoint_data_transform(char* path, int w, int h, int boxes, int keypoints_num, int classes, float jitter, float hue, float saturation, float exposure, int openscale,
+    float filter_thresh, float min_scale, float max_scale)
+{
+    data d = {0};
+
+    d.shallow = 0;
+
+    d.X.rows = 1;
+    d.X.vals = calloc(d.X.rows, sizeof(float*));
+
+    d.X.cols = h*w*3;
+
+    d.y = make_matrix(d.X.rows, (5 + keypoints_num * 3) * boxes);
+
+    image orig = load_image_color(path, 0, 0);
+    image sized = make_image(w, h, orig.c);
+    fill_image(sized, .5);
+    // for test
+    //image sized = letterbox_image(orig, w, h);
+
+    //jitter = 0;
+    float dw = jitter * orig.w;
+    float dh = jitter * orig.h;
+
+    float new_ar = (orig.w + rand_uniform(-dw, dw)) / (orig.h + rand_uniform(-dh, dh));
+
+    float scale = 1;
+
+    if (openscale)
+        scale = rand_uniform(min_scale, max_scale);
+
+        //printf("scale: %f\n", scale);
+
+    float nw, nh;
+
+    if(new_ar < (float)w / h){
+        nh = scale * h;
+        nw = nh * new_ar;
+    } else {
+        nw = scale * w;
+        nh = nw / new_ar;
+    }
+
+    float dx = rand_uniform(0, w - nw);
+    float dy = rand_uniform(0, h - nh);
+    // for test
+    //float dx = 0;
+    //float dy = (h - nh) / 2;
+
+    place_image(orig, nw, nh, dx, dy, sized);
+
+    random_distort_image(sized, hue, saturation, exposure);
+
+    int flip = rand()%2;
+    //for test
+    //flip = 0;
+    if(flip) flip_image(sized);
+    d.X.vals[0] = sized.data;
+
+    //show_image(sized, "sized", 0);
+
+    fill_truth_keypoint_detection(path, boxes, keypoints_num, d.y.vals[0], classes, flip, -dx/w, -dy/h, nw/w, nh/h, filter_thresh);
+
+    // for test
+    /*
+    IplImage* train_img = image_to_ipl(sized);
+    float *truth = d.y.vals[0];
+    int i, n;
+    n = 4 + 3 * keypoints_num + 1;
+    for (i = 0; i < boxes; ++i) {
+        float x = truth[i * n + 0] * sized.w;
+        float y = truth[i * n + 1] * sized.h;
+        float w = truth[i * n + 2] * sized.w;
+        float h = truth[i * n + 3] * sized.h;
+        float id = truth[i * n + n-1;
+        if (x == 0 && y == 0) continue;
+        printf("%f %f %f %f %f\n", x, y, w, h, id);
+        cvRectangle(train_img, cvPoint((int)(x-w/2), (int)(y-h/2)), cvPoint((int)(x+w/2), (int)(y+h/2)),  CV_RGB(0, 0, 0), 2, 8, 0);
+    }
+    cvShowImage("train_img", train_img);
+    cvWaitKey(0);
+    */
+
+    free_image(orig);
+
+    return d;
+}
+
+data load_data_keypoint(int n, char **paths, int m, int w, int h, int boxes, int keypoints_num, int classes, float jitter, float hue, float saturation, float exposure,
+    int openscale, float filter_thresh, int data_fusion_type, float data_fusion_prob, float mosaic_min_offset)
+{
+    char **random_paths = get_random_paths(paths, n, m);
+    int i;
+    data d = {0};
+    d.shallow = 0;
+
+    d.X.rows = n;
+    d.X.vals = calloc(d.X.rows, sizeof(float*));
+    d.X.cols = h*w*3;
+
+    d.y = make_matrix(n, (5 + keypoints_num * 3)*boxes);  // cx, cy, w, h, cls, vis1, keypoint1_x, keypoint1_y, ...
+
+    for(i = 0; i < n; ++i){
+        switch (data_fusion_type) {
+            case 0:
+            {
+                // original
+                data single = single_keypoint_data_transform(random_paths[i], w, h, boxes, keypoints_num, classes, jitter, hue, saturation, exposure, openscale, filter_thresh, 0.25, 2);
+                d.X.vals[i] = single.X.vals[0];
+                memcpy(d.y.vals[i], single.y.vals[0], d.y.cols * sizeof(float));
+                free(single.y.vals[0]);
+                break;
+            }
+            case 1:
+            {
+                // unimplemented, use original
+                data single = single_data_transform(random_paths[i], w, h, boxes, classes, jitter, hue, saturation, exposure, openscale, filter_thresh, 0.25, 2);
+                d.X.vals[i] = single.X.vals[0];
+                memcpy(d.y.vals[i], single.y.vals[0], d.y.cols * sizeof(float));
+                free(single.y.vals[0]);
+                break;
+            }
+            case 2:
+            {
+                // unimplemented, use original
+                data single = single_data_transform(random_paths[i], w, h, boxes, classes, jitter, hue, saturation, exposure, openscale, filter_thresh, 0.25, 2);
+                d.X.vals[i] = single.X.vals[0];
+                memcpy(d.y.vals[i], single.y.vals[0], d.y.cols * sizeof(float));
+                free(single.y.vals[0]);
+                break;
+            }
+            case 3:
+            {
+                float fusion_prob = rand_uniform(0, 1);
+                if (fusion_prob < data_fusion_prob) {
+                    // 1 + mosaic_num-1 => mosaic_num
+                    char **random_fusion_paths = get_random_paths(paths, 3, m);
+                    int cut_x = rand_int(w * mosaic_min_offset, w * (1-mosaic_min_offset));
+                    int cut_y = rand_int(h * mosaic_min_offset, h * (1-mosaic_min_offset));
+                    // get four images/labels after transform
+                    // [0 ~ cut_x, 0 ~ cut_y]
+                    // [cut_x ~ w, 0 ~ cut_y]
+                    // [0 ~ cut_x, cut_y ~ h]
+                    // [cut_x ~ w, cut_y ~ h]
+
+                    image fusion_image = make_image(w, h, 3);
+                    float *fusion_label = calloc(5*boxes, sizeof(float));
+                    int fusion_count = 0;
+
+                    int j, p, q, row, col, x_offset, y_offset;
+                    char *path;
+
+                    for(j = 0; j < 4; j++) {
+                        data single;
+                        if (j==0) {
+                            row = cut_y;
+                            col = cut_x;
+                            x_offset = 0;
+                            y_offset = 0;
+                            path = random_paths[i];
+                        } else if (j==1) {
+                            row = cut_y;
+                            col = w - cut_x;
+                            x_offset = cut_x;
+                            y_offset = 0;
+                            path = random_fusion_paths[j-1];
+                        } else if (j==2) {
+                            row = h - cut_y;
+                            col = cut_x;
+                            x_offset = 0;
+                            y_offset = cut_y;
+                            path = random_fusion_paths[j-1];
+                        } else if (j==3) {
+                            row = h - cut_y;
+                            col = w - cut_x;
+                            x_offset = cut_x;
+                            y_offset = cut_y;
+                            path = random_fusion_paths[j-1];
+                        }
+                        // printf("image_path: %s\n", path);
+                        single = single_data_transform(path, col, row, boxes, classes, jitter, hue, saturation, exposure, openscale, filter_thresh, 1- mosaic_min_offset, 1 / (1-mosaic_min_offset));
+
+                        // test single
+                        /*
+                        image single_image = float_to_image(col, row, 3, single.X.vals[0]);
+                        show_image(single_image, "single_image", 0);
+                        rgbgr_image(single_image);
+                        IplImage* simg = image_to_ipl(single_image);
+                        float *truth = single.y.vals[0];
+                        int i;
+                        for (i = 0; i < boxes; ++i) {
+                            float x = truth[i * 5 + 0] * single_image.w;
+                            float y = truth[i * 5 + 1] * single_image.h;
+                            float w = truth[i * 5 + 2] * single_image.w;
+                            float h = truth[i * 5 + 3] * single_image.h;
+                            float id = truth[i * 5 + 4];
+                            if (x == 0 && y == 0) continue;
+                            printf("label: %f %f %f %f %f\n", x, y, w, h, id);
+                            cvRectangle(simg, cvPoint((int)(x-w/2), (int)(y-h/2)), cvPoint((int)(x+w/2), (int)(y+h/2)),  CV_RGB(0, 255, 0), 2, 8, 0);
+                        }
+                        cvShowImage("simg", simg);
+                        cvWaitKey(0);
+                        */
+
+                        for(p = 0; p < 3; p++) {
+                            for (q = 0; q < row; q++) {
+                                memcpy(fusion_image.data + p*w*h + (q+y_offset) * w + x_offset, single.X.vals[0] + p*row*col + q * col, col * sizeof(float));
+                            }
+                        }
+                        // show fusion image
+                        // show_image(fusion_image, "fusion_image", 0);
+                        // adjust label
+                        float *single_label = single.y.vals[0];
+                        for(p = 0; p < boxes; p++) {
+                            float bx = single_label[p*5+0];
+                            float by = single_label[p*5+1];
+                            float bw = single_label[p*5+2];
+                            float bh = single_label[p*5+3];
+                            int id = single_label[p*5+4];
+
+                            bx = (bx * col + x_offset) / w;
+                            by = (by * row + y_offset) / h;
+                            bw = bw * col / w;
+                            bh = bh * row / h;
+
+                            if ((bw < .001 || bh < .001))
+                                continue;
+
+                            fusion_label[fusion_count*5+0] = bx;
+                            fusion_label[fusion_count*5+1] = by;
+                            fusion_label[fusion_count*5+2] = bw;
+                            fusion_label[fusion_count*5+3] = bh;
+                            fusion_label[fusion_count*5+4] = id;
+
+                            fusion_count++;
+                        }
+                        // freeze the single image and label data
+                        free_data(single);
+                    }
+
+                    d.X.vals[i] = fusion_image.data;
+                    //printf("brefore memcpy fusion_label\n");
+                    memcpy(d.y.vals[i], fusion_label, d.y.cols * sizeof(float));
+                    //printf("after memcpy fusion_label\n");
+
+                    // check the ground truth
+                    /*
+                    show_image(fusion_image, "fusion_image", 0);
+                    rgbgr_image(fusion_image);
+                    IplImage* fimg = image_to_ipl(fusion_image);
+                    float *truth = d.y.vals[i];
+                    int i;
+                    for (i = 0; i < boxes; ++i) {
+                        float x = truth[i * 5 + 0] * fusion_image.w;
+                        float y = truth[i * 5 + 1] * fusion_image.h;
+                        float w = truth[i * 5 + 2] * fusion_image.w;
+                        float h = truth[i * 5 + 3] * fusion_image.h;
+                        float id = truth[i * 5 + 4];
+                        if (x == 0 && y == 0) continue;
+                        printf("label: %f %f %f %f %f\n", x, y, w, h, id);
+                        cvRectangle(fimg, cvPoint((int)(x-w/2), (int)(y-h/2)), cvPoint((int)(x+w/2), (int)(y+h/2)),  CV_RGB(0, 255, 0), 2, 8, 0);
+                    }
+                    cvShowImage("fimg", fimg);
+                    cvWaitKey(0);
+                    */
+                    free(fusion_label);
+                    free(random_fusion_paths);
+
+                    //printf("finish mosaic load\n");
+
+                } else {
+                    data single = single_data_transform(random_paths[0], w, h, boxes, classes, jitter, hue, saturation, exposure, openscale, filter_thresh, 0.25, 2);
+                    d.X.vals[i] = single.X.vals[0];
+                    memcpy(d.y.vals[i], single.y.vals[0], d.y.cols * sizeof(float));
+                    free(single.y.vals[0]);
+                }
+                break;
+            }
+        }
+    }
+
+    // free
     free(random_paths);
     return d;
 }
@@ -1452,6 +2040,8 @@ void *load_thread(void *ptr)
         *a.d = load_data_region(a.n, a.paths, a.m, a.w, a.h, a.num_boxes, a.classes, a.jitter, a.hue, a.saturation, a.exposure);
     } else if (a.type == DETECTION_DATA){
         *a.d = load_data_detection(a.n, a.paths, a.m, a.w, a.h, a.num_boxes, a.classes, a.jitter, a.hue, a.saturation, a.exposure, a.openscale, a.filter_thresh, a.data_fusion_type, a.data_fusion_prob, a.mosaic_min_offset);
+    } else if (a.type == KEYPOINT_DATA){
+        *a.d = load_data_keypoint(a.n, a.paths, a.m, a.w, a.h, a.num_boxes, a.keypoints_num, a.classes, a.jitter, a.hue, a.saturation, a.exposure, a.openscale, a.filter_thresh, a.data_fusion_type, a.data_fusion_prob, a.mosaic_min_offset);
     } else if (a.type == SWAG_DATA){
         *a.d = load_data_swag(a.paths, a.n, a.classes, a.jitter);
     } else if (a.type == COMPARE_DATA){

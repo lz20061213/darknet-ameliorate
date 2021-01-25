@@ -18,6 +18,7 @@
 #include "detection_layer.h"
 #include "region_layer.h"
 #include "yolo_layer.h"
+#include "keypoint_yolo_layer.h"
 #include "distill_yolo_layer.h"
 #include "mutual_yolo_layer.h"
 #include "mimicutual_yolo_layer.h"
@@ -58,7 +59,7 @@ load_args get_base_args(network *net)
     args.data_fusion_type = net->data_fusion_type;
     args.data_fusion_prob = net->data_fusion_prob;
     args.mosaic_min_offset = net->mosaic_min_offset;
-
+    args.keypoints_num = net->keypoints_num;
     return args;
 }
 
@@ -316,34 +317,98 @@ void update_network(network *netp) {
 void calc_network_cost(network *netp)
 {
     network net = *netp;
-    int i;
-    float sum1 = 0;
-    float sum2 = 0;
-    int count1 = 0;
-    int count2 = 0;
+    if (!net.train) return;
+
+    int i, index;
+
+    // COST, HINT_COST, YOLO, DISTILL_YOLO, KEYPOINT_YOLO, MUTUAL_YOLO, MIMICUTUAL_YOLO, DOUBLE_YOLO, HEATMAP
+    int cost_type_count = 9;
+    float *sums = calloc(cost_type_count, sizeof(float));
+    int *counts = calloc(cost_type_count, sizeof(int));
+    memset(counts, 0, cost_type_count*sizeof(float));
+    memset(sums, 0, cost_type_count*sizeof(int));
+
     for(i = 0; i < net.n; ++i){
         if(net.layers[i].cost){
-            if (net.layers[i].type == YOLO || net.layers[i].type == DISTILL_YOLO || net.layers[i].type == MUTUAL_YOLO || net.layers[i].type == MIMICUTUAL_YOLO ||
-                net.layers[i].type == DOUBLE_YOLO) {
-                sum1 += net.layers[i].cost[0];
-                ++count1;
-            } else {
-                sum2 += net.layers[i].cost[0];
-                ++count2;
+            switch (net.layers[i].type) {
+                case COST:
+                    index = 0;
+                    break;
+                case HINT_COST:
+                    index = 1;
+                    break;
+                case YOLO:
+                    index = 2;
+                    break;
+                case DISTILL_YOLO:
+                    index = 3;
+                    break;
+                case KEYPOINT_YOLO:
+                    index = 4;
+                    break;
+                case MUTUAL_YOLO:
+                    index = 5;
+                    break;
+                case MIMICUTUAL_YOLO:
+                    index = 6;
+                    break;
+                case DOUBLE_YOLO:
+                    index = 7;
+                    break;
+                case HEATMAP:
+                    index = 8;
+                    break;
+                default:
+                    index = -1;
+                    break;
+            }
+            if (index >= 0) {
+                counts[index]++;
+                sums[index] += net.layers[i].cost[0];
             }
         }
     }
+
     *net.cost = 0;
-    if (count1 != 0) {
-        *net.cost += sum1/count1;
+    printf("loss for ");
+    for (i = 0; i < cost_type_count; ++i) {
+        if (counts[i] > 0) {
+            float cost_i = sums[i] / counts[i];
+            *net.cost += cost_i;
+            switch (i) {
+                case 0:
+                    printf("classification: %.2f ", cost_i);
+                    break;
+                case 1:
+                    printf("hint: %.2f ", cost_i);
+                    break;
+                case 2:
+                    printf("yolo: %.2f ", cost_i);
+                    break;
+                case 3:
+                    printf("distill_yolo: %.2f ", cost_i);
+                    break;
+                case 4:
+                    printf("keypoint_yolo: %.2f ", cost_i);
+                    break;
+                case 5:
+                    printf("mutual_yolo: %.2f ", cost_i);
+                    break;
+                case 6:
+                    printf("mimicutual_yolo: %.2f ", cost_i);
+                    break;
+                case 7:
+                    printf("double_yolo: %.2f ", cost_i);
+                    break;
+                case 8:
+                    printf("heatmap: %.2f ", cost_i);
+                    break;
+            }
+        }
     }
-    if (count2 != 0) {
-        *net.cost += sum2/count2;
-    }
-    if(count2 != 0) {
-        //printf("count2: %d\n", count2);
-        printf("loss for yolo and hint: %.2f, %.2f\n", sum1/count1, sum2/count2);
-    }
+    printf("\n");
+    free(counts);
+    free(sums);
 }
 
 int get_predicted_class_network(network *net)
@@ -911,6 +976,9 @@ int num_detections(network *net, float thresh)
         if(l.type == DETECTION || l.type == REGION){
             s += l.w*l.h*l.n;
         }
+        if(l.type == KEYPOINT_YOLO){
+            s += keypoint_yolo_num_detection_with_keypoints(l, thresh);
+        }
     }
     return s;
 }
@@ -928,6 +996,31 @@ detection *make_network_boxes(network *net, float thresh, int *num)
         if(l.coords > 4){
             dets[i].mask = calloc(l.coords-4, sizeof(float));
         }
+    }
+    return dets;
+}
+
+detection_with_keypoints *make_network_boxes_with_keypoints(network *net, float thresh, int *num)
+{
+    int i, j;
+    layer l = {0};
+    for (i=net->n-1; i>=0; --i) {
+        l = net->layers[i];
+        if (l.type == KEYPOINT_YOLO)
+            break;
+    }
+    int nboxes_with_keypoints = num_detections(net, thresh);
+    if(num) *num = nboxes_with_keypoints;
+    detection_with_keypoints *dets = calloc(nboxes_with_keypoints, sizeof(detection_with_keypoints));
+    for(i = 0; i < nboxes_with_keypoints; ++i) {
+        dets[i].prob = calloc(l.classes, sizeof(float));
+        if(l.coords > 4) {
+            dets[i].mask = calloc(l.coords-4, sizeof(float));
+        }
+        // alloc in keypoint_yolo_layer get_keypoint_yolo_detections_with_keypoints
+        //for(j = 0; j < l.keypoints_num; ++j) {
+            //dets[i].bkps.kps = calloc(l.keypoints_num, sizeof(keypoint));
+        //}
     }
     return dets;
 }
@@ -958,6 +1051,18 @@ void fill_network_boxes(network *net, int w, int h, float thresh, float hier, in
     }
 }
 
+void fill_network_boxes_with_keypoints(network *net, int w, int h, float thresh, float hier, int *map, int relative, detection_with_keypoints *dets)
+{
+    int j;
+    for(j = 0; j < net->n; ++j){
+        layer l = net->layers[j];
+        if(l.type == KEYPOINT_YOLO){
+            int count = get_keypoint_yolo_detections_with_keypoints(l, w, h, net->w, net->h, thresh, map, relative, dets);
+            dets += count;
+        }
+    }
+}
+
 detection *get_network_boxes(network *net, int w, int h, float thresh, float hier, int *map, int relative, int *num)
 {
     detection *dets = make_network_boxes(net, thresh, num);
@@ -967,12 +1072,31 @@ detection *get_network_boxes(network *net, int w, int h, float thresh, float hie
     return dets;
 }
 
+detection_with_keypoints *get_network_boxes_with_keypoints(network *net, int w, int h, float thresh, float hier, int *map, int relative, int *num)
+{
+    detection_with_keypoints *dets = make_network_boxes_with_keypoints(net, thresh, num);
+    fill_network_boxes_with_keypoints(net, w, h, thresh, hier, map, relative, dets);
+    return dets;
+}
+
 void free_detections(detection *dets, int n)
 {
     int i;
     for(i = 0; i < n; ++i){
         free(dets[i].prob);
         if(dets[i].mask) free(dets[i].mask);
+    }
+    free(dets);
+}
+
+
+void free_detections_with_keypoints(detection_with_keypoints *dets, int n)
+{
+    int i;
+    for(i = 0; i < n; ++i) {
+        free(dets[i].prob);
+        if(dets[i].mask) free(dets[i].mask);
+        free(dets[i].bkps.kps);
     }
     free(dets);
 }

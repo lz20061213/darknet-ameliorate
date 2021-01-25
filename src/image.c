@@ -207,6 +207,27 @@ void draw_box_width(image a, int x1, int y1, int x2, int y2, int w, float r, flo
     }
 }
 
+void draw_keypoint_width(image a, int x, int y, int w, float r, float g, float b)
+{
+    //printf("point, %d %d %d\n", x, y, w);
+    int i, j, xbegin, xend, ybegin, yend;
+    xbegin = x - w;
+    xend = x + w;
+    ybegin = y - w;
+    yend = y + w;
+    for (j=ybegin; j<=yend; ++j) {
+        for (i=xbegin; i<=xend; ++i) {
+            if ((i-x)*(i-x)+(j-y)*(j-y) > w * w) continue;
+            a.data[i + j*a.w + 0*a.w*a.h] = r;
+            a.data[i + j*a.w + 0*a.w*a.h] = r;
+            a.data[i + j*a.w + 1*a.w*a.h] = g;
+            a.data[i + j*a.w + 1*a.w*a.h] = g;
+            a.data[i + j*a.w + 2*a.w*a.h] = b;
+            a.data[i + j*a.w + 2*a.w*a.h] = b;
+        }
+    }
+}
+
 void draw_bbox(image a, box bbox, int w, float r, float g, float b)
 {
     int left  = (bbox.x-bbox.w/2)*a.w;
@@ -308,6 +329,93 @@ void draw_detections(image im, detection *dets, int num, float thresh, char **na
         }
     }
 }
+
+void draw_detections_with_keypoints(image im, detection_with_keypoints *dets, int num, float thresh, char **names, image **alphabet, int classes)
+{
+    int i,j;
+
+    for(i = 0; i < num; ++i){
+        char labelstr[4096] = {0};
+        int class = -1;
+        for(j = 0; j < classes; ++j){
+            if (dets[i].prob[j] > thresh){
+                if (class < 0) {
+                    strcat(labelstr, names[j]);
+                    class = j;
+                } else {
+                    strcat(labelstr, ", ");
+                    strcat(labelstr, names[j]);
+                }
+                printf("%s: %.0f%%\n", names[j], dets[i].prob[j]*100);
+            }
+        }
+        if(class >= 0){
+            int width = im.h * .006;
+
+            /*
+               if(0){
+               width = pow(prob, 1./2.)*10+1;
+               alphabet = 0;
+               }
+             */
+
+            //printf("%d %s: %.0f%%\n", i, names[class], prob*100);
+            int offset = class*123457 % classes;
+            float red = get_color(2,offset,classes);
+            float green = get_color(1,offset,classes);
+            float blue = get_color(0,offset,classes);
+            float rgb[3];
+
+            //width = prob*20+2;
+
+            rgb[0] = red;
+            rgb[1] = green;
+            rgb[2] = blue;
+            box_with_keypoints bkps = dets[i].bkps;
+            //printf("%f %f %f %f\n", b.x, b.y, b.w, b.h);
+
+            int left  = (bkps.x-bkps.w/2.)*im.w;
+            int right = (bkps.x+bkps.w/2.)*im.w;
+            int top   = (bkps.y-bkps.h/2.)*im.h;
+            int bot   = (bkps.y+bkps.h/2.)*im.h;
+
+            if(left < 0) left = 0;
+            if(right > im.w-1) right = im.w-1;
+            if(top < 0) top = 0;
+            if(bot > im.h-1) bot = im.h-1;
+
+            //printf("center: %f %f\n", (left+right)/2., (top+bot)/2.);
+            //printf("rb: %d %d %d %d\n", left, top, right, bot);
+
+            draw_box_width(im, left, top, right, bot, width, red, green, blue);
+            for (j=0; j<bkps.keypoints_num; ++j) {
+                offset = (j + classes) * 1234567 % (classes+bkps.keypoints_num);
+                red = get_color(2, offset, classes+bkps.keypoints_num);
+                green = get_color(1, offset, classes+bkps.keypoints_num);
+                blue = get_color(0, offset, classes+bkps.keypoints_num);
+                bkps.kps[j].x *= im.w;
+                bkps.kps[j].y *= im.h;
+                //printf("draw keypoints_num, %f %f\n", bkps.kps[j].x, bkps.kps[j].y);
+                draw_keypoint_width(im, bkps.kps[j].x, bkps.kps[j].y, width, red, green, blue);
+            }
+            if (alphabet) {
+                image label = get_label(alphabet, labelstr, (im.h*.03));
+                draw_label(im, top + width, left, label, rgb);
+                free_image(label);
+            }
+            if (dets[i].mask){
+                image mask = float_to_image(14, 14, 1, dets[i].mask);
+                image resized_mask = resize_image(mask, bkps.w*im.w, bkps.h*im.h);
+                image tmask = threshold_image(resized_mask, .5);
+                embed_image(tmask, im, left, top);
+                free_image(mask);
+                free_image(resized_mask);
+                free_image(tmask);
+            }
+        }
+    }
+}
+
 
 void transpose_image(image im)
 {

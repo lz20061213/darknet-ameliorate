@@ -15,6 +15,7 @@ void deinter_cpu(int NX, float *X, int NY, float *Y, int B, float *OUT);
 void mult_add_into_cpu(int N, float *X, float *Y, float *Z);
 
 void const_cpu(int N, float ALPHA, float *X, int INCX);
+void clamp_cpu(int N, float * X, int INCX, float clamp_min, float clamp_max);
 void pow_cpu(int N, float ALPHA, float *X, int INCX, float *Y, int INCY);
 void mul_cpu(int N, float *X, int INCX, float *Y, int INCY);
 
@@ -57,6 +58,7 @@ void mask_gpu(int N, float * X, float mask_num, float * mask, float val);
 void scale_mask_gpu(int N, float * X, float mask_num, float * mask, float scale);
 void const_gpu(int N, float ALPHA, float *X, int INCX);
 void constrain_gpu(int N, float ALPHA, float * X, int INCX);
+void clamp_gpu(int N, float * X, int INCX, float clamp_min, float clamp_max);
 void pow_gpu(int N, float ALPHA, float *X, int INCX, float *Y, int INCY);
 void add_pow_gpu(int N, float ALPHA, float *x, int INCX, float *Y, int INCY);
 void mul_gpu(int N, float *X, int INCX, float *Y, int INCY);

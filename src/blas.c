@@ -164,6 +164,12 @@ void const_cpu(int N, float ALPHA, float *X, int INCX)
     for(i = 0; i < N; ++i) X[i*INCX] = ALPHA;
 }
 
+void clamp_cpu(int N, float *X, int INCX, float clamp_min, float clamp_max)
+{
+    int i;
+    for(i = 0; i < N; ++i) X[i*INCX] = fmin(clamp_max, fmax(clamp_min, X[i*INCX]));
+}
+
 void mul_cpu(int N, float *X, int INCX, float *Y, int INCY)
 {
     int i;

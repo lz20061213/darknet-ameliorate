@@ -575,6 +575,12 @@ __global__ void constrain_kernel(int N, float ALPHA, float *X, int INCX)
     if(i < N) X[i*INCX] = fminf(ALPHA, fmaxf(-ALPHA, X[i*INCX]));
 }
 
+__global__ void clamp_kernel(int N, float *X, int INCX, float clamp_min, float clamp_max)
+{
+    int i = (blockIdx.x + blockIdx.y*gridDim.x) * blockDim.x + threadIdx.x;
+    if(i < N) X[i*INCX] = fminf(clamp_max, fmaxf(clamp_min, X[i*INCX]));
+}
+
 __global__ void quantize_kernel(float *x, int n, float shift, float bound, int diff, float static_rate, int is_round)
 {
     int i = (blockIdx.x + blockIdx.y*gridDim.x) * blockDim.x + threadIdx.x;
@@ -875,6 +881,12 @@ extern "C" void const_gpu(int N, float ALPHA, float * X, int INCX)
 extern "C" void constrain_gpu(int N, float ALPHA, float * X, int INCX)
 {
     constrain_kernel<<<cuda_gridsize(N), BLOCK>>>(N, ALPHA, X, INCX);
+    check_error(cudaPeekAtLastError());
+}
+
+extern "C" void clamp_gpu(int N, float *X, int INCX, float clamp_min, float clamp_max)
+{
+    clamp_kernel<<<cuda_gridsize(N), BLOCK>>>(N, X, INCX, clamp_min, clamp_max);
     check_error(cudaPeekAtLastError());
 }
 

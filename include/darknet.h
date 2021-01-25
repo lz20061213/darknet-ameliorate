@@ -93,6 +93,7 @@ typedef enum {
     XNOR,
     REGION,
     YOLO,
+    KEYPOINT_YOLO,
     DISTILL_YOLO,
     MUTUAL_YOLO,
     MIMICUTUAL_YOLO,
@@ -104,7 +105,8 @@ typedef enum {
     L2NORM,
     BLANK,
     CHANNEL_SLICE,
-    CHANNEL_SHUFFLE
+    CHANNEL_SHUFFLE,
+    HEATMAP
 } LAYER_TYPE;
 
 typedef enum{
@@ -191,6 +193,9 @@ struct layer{
     int *bias_fl;
     int *bias_fls;
     int *x_fl;
+
+    // for keypoint_yolo, heatmap
+    int keypoints_num;
 
     int reverse;
     int flatten;
@@ -707,6 +712,16 @@ typedef struct box {
     float x, y, w, h;
 } box;
 
+typedef struct keypoint {
+    float v, x, y;
+} keypoint;
+
+typedef struct box_with_keypoints {
+    float x, y, w, h;
+    int keypoints_num;
+    keypoint *kps;
+} box_with_keypoints;
+
 typedef struct boxabs {
     float left, right, top, bot;
 } boxabs;
@@ -730,6 +745,15 @@ typedef struct detection{
     float objectness;
     int sort_class;
 } detection;
+
+typedef struct detection_with_keypoints {
+    box_with_keypoints bkps;
+    int classes;
+    float *prob;
+    float *mask;
+    float objectness;
+    int sort_class;
+} detection_with_keypoints;
 
 typedef struct matrix{
     int rows, cols;
@@ -763,7 +787,8 @@ typedef enum {
     REGRESSION_DATA,
     SEGMENTATION_DATA,
     INSTANCE_DATA,
-    ISEG_DATA
+    ISEG_DATA,
+    KEYPOINT_DATA
 } data_type;
 
 typedef struct load_args{
@@ -797,6 +822,7 @@ typedef struct load_args{
     int data_fusion_type;
     float data_fusion_prob;
     float mosaic_min_offset;
+    int keypoints_num;
     int is_todct;
     data *d;
     image *im;
@@ -811,6 +837,13 @@ typedef struct{
     float left, right, top, bottom;
 } box_label;
 
+typedef struct{
+    int id;
+    float x,y,w,h;
+    float left, right, top, bottom;
+    int keypoints_num;
+    keypoint *kps;
+} keypoint_label;
 
 network *load_network(char *cfg, char *weights, int clear);
 load_args get_base_args(network *net);
@@ -934,6 +967,7 @@ void zero_objectness(layer l);
 void get_region_detections(layer l, int w, int h, int netw, int neth, float thresh, int *map, float tree_thresh, int relative, detection *dets);
 int get_yolo_detections(layer l, int w, int h, int netw, int neth, float thresh, int *map, int relative, detection *dets);
 int get_double_yolo_detections(layer l, network net, int w, int h, int netw, int neth, float thresh, int *map, int relative, detection *dets);
+int get_keypoint_yolo_detections_with_keypoints(layer l, int w, int h, int netw, int neth, float thresh, int *map, int relative, detection_with_keypoints *dets);
 void free_network(network *net);
 void set_batch_network(network *net, int b);
 void set_temp_network(network *net, float t);
@@ -955,6 +989,7 @@ void test_resize(char *filename);
 int show_image(image p, const char *name, int ms);
 image copy_image(image p);
 void draw_box_width(image a, int x1, int y1, int x2, int y2, int w, float r, float g, float b);
+void draw_keypoint_width(image a, int x, int y, int w, float r, float g, float b);
 float get_current_rate(network *net);
 void composite_3d(char *f1, char *f2, char *out, int delta);
 data load_data_old(char **paths, int n, int m, char **labels, int k, int w, int h);
@@ -980,13 +1015,21 @@ float box_giou(box a, box b);
 float box_diou(box a, box b);
 float box_ciou(box a, box b);
 float box_lb_dis(box a, box b);
+float box_with_keypoints_iou(box_with_keypoints a, box_with_keypoints b);
+float box_with_keypoints_giou(box_with_keypoints a, box_with_keypoints b);
+float box_with_keypoints_diou(box_with_keypoints a, box_with_keypoints b);
+float box_with_keypoints_ciou(box_with_keypoints a, box_with_keypoints b);
+float box_with_keypoints_lb_dis(box_with_keypoints a, box_with_keypoints b);
 boxabs to_tblr(box a);
 dxrep dx_box_iou(box a, box b, IOU_LOSS iou_loss);
+dxrep dx_box_with_keypoints_iou(box_with_keypoints a, box_with_keypoints b, IOU_LOSS iou_loss);
 
 data load_all_cifar10();
 box_label *read_boxes(char *filename, int *n);
 box float_to_box(float *f, int stride);
+box_with_keypoints float_to_box_with_keypoints(float *f, int stride, int keypoints_num);
 void draw_detections(image im, detection *dets, int num, float thresh, char **names, image **alphabet, int classes);
+void draw_detections_with_keypoints(image im, detection_with_keypoints *dets, int num, float thresh, char **names, image **alphabet, int classes);
 
 matrix network_predict_data(network *net, data test);
 image **load_alphabet();
@@ -998,7 +1041,9 @@ int network_height(network *net);
 float *network_predict_image(network *net, image im);
 void network_detect(network *net, image im, float thresh, float hier_thresh, float nms, detection *dets);
 detection *get_network_boxes(network *net, int w, int h, float thresh, float hier, int *map, int relative, int *num);
+detection_with_keypoints *get_network_boxes_with_keypoints(network *net, int w, int h, float thresh, float hier, int *map, int relative, int *num);
 void free_detections(detection *dets, int n);
+void free_detections_with_keypoints(detection_with_keypoints *dets, int n);
 
 void reset_network_state(network *net, int b);
 
@@ -1006,7 +1051,9 @@ char **get_labels(char *filename);
 char **get_labels_custom(char *filename, int *size);
 void do_nms_obj(detection *dets, int total, int classes, float thresh);
 void do_nms_sort(detection *dets, int total, int classes, float thresh);
+void do_nms_sort_with_keypoints(detection_with_keypoints *dets, int total, int classes, float thresh);
 void diounms_sort(detection *dets, int total, int classes, float thresh, NMS_KIND nms_kind, float beta1);
+void diounms_sort_with_keypoints(detection_with_keypoints *dets, int total, int classes, float thresh, NMS_KIND nms_kind, float beta1);
 
 matrix make_matrix(int rows, int cols);
 
