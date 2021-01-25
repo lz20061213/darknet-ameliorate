@@ -1,0 +1,480 @@
+The system is: Linux - 4.10.0-42-generic - x86_64
+Compiling the C compiler identification source file "CMakeCCompilerId.c" succeeded.
+Compiler: /usr/bin/cc 
+Build flags: 
+Id flags: 
+
+The output was:
+0
+
+
+Compilation of the C compiler identification source "CMakeCCompilerId.c" produced "a.out"
+
+The C compiler identification is GNU, found in "/home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/3.5.1/CompilerIdC/a.out"
+
+Determining if the C compiler works passed with the following output:
+Change Dir: /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_fb954/fast"
+/usr/bin/make -f CMakeFiles/cmTC_fb954.dir/build.make CMakeFiles/cmTC_fb954.dir/build
+make[1]: Entering directory '/data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_fb954.dir/testCCompiler.c.o
+/usr/bin/cc     -o CMakeFiles/cmTC_fb954.dir/testCCompiler.c.o   -c /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp/testCCompiler.c
+Linking C executable cmTC_fb954
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_fb954.dir/link.txt --verbose=1
+/usr/bin/cc       CMakeFiles/cmTC_fb954.dir/testCCompiler.c.o  -o cmTC_fb954 -rdynamic 
+make[1]: Leaving directory '/data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp'
+
+
+Detecting C compiler ABI info compiled with the following output:
+Change Dir: /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_319a7/fast"
+/usr/bin/make -f CMakeFiles/cmTC_319a7.dir/build.make CMakeFiles/cmTC_319a7.dir/build
+make[1]: Entering directory '/data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_319a7.dir/CMakeCCompilerABI.c.o
+/usr/bin/cc     -o CMakeFiles/cmTC_319a7.dir/CMakeCCompilerABI.c.o   -c /usr/share/cmake-3.5/Modules/CMakeCCompilerABI.c
+Linking C executable cmTC_319a7
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_319a7.dir/link.txt --verbose=1
+/usr/bin/cc      -v CMakeFiles/cmTC_319a7.dir/CMakeCCompilerABI.c.o  -o cmTC_319a7 -rdynamic  
+Using built-in specs.
+COLLECT_GCC=/usr/bin/cc
+COLLECT_LTO_WRAPPER=/usr/lib/gcc/x86_64-linux-gnu/5/lto-wrapper
+Target: x86_64-linux-gnu
+Configured with: ../src/configure -v --with-pkgversion='Ubuntu 5.4.0-6ubuntu1~16.04.12' --with-bugurl=file:///usr/share/doc/gcc-5/README.Bugs --enable-languages=c,ada,c++,java,go,d,fortran,objc,obj-c++ --prefix=/usr --program-suffix=-5 --enable-shared --enable-linker-build-id --libexecdir=/usr/lib --without-included-gettext --enable-threads=posix --libdir=/usr/lib --enable-nls --with-sysroot=/ --enable-clocale=gnu --enable-libstdcxx-debug --enable-libstdcxx-time=yes --with-default-libstdcxx-abi=new --enable-gnu-unique-object --disable-vtable-verify --enable-libmpx --enable-plugin --with-system-zlib --disable-browser-plugin --enable-java-awt=gtk --enable-gtk-cairo --with-java-home=/usr/lib/jvm/java-1.5.0-gcj-5-amd64/jre --enable-java-home --with-jvm-root-dir=/usr/lib/jvm/java-1.5.0-gcj-5-amd64 --with-jvm-jar-dir=/usr/lib/jvm-exports/java-1.5.0-gcj-5-amd64 --with-arch-directory=amd64 --with-ecj-jar=/usr/share/java/eclipse-ecj.jar --enable-objc-gc --enable-multiarch --disable-werror --with-arch-32=i686 --with-abi=m64 --with-multilib-list=m32,m64,mx32 --enable-multilib --with-tune=generic --enable-checking=release --build=x86_64-linux-gnu --host=x86_64-linux-gnu --target=x86_64-linux-gnu
+Thread model: posix
+gcc version 5.4.0 20160609 (Ubuntu 5.4.0-6ubuntu1~16.04.12) 
+COMPILER_PATH=/usr/lib/gcc/x86_64-linux-gnu/5/:/usr/lib/gcc/x86_64-linux-gnu/5/:/usr/lib/gcc/x86_64-linux-gnu/:/usr/lib/gcc/x86_64-linux-gnu/5/:/usr/lib/gcc/x86_64-linux-gnu/
+LIBRARY_PATH=/usr/lib/gcc/x86_64-linux-gnu/5/:/usr/lib/gcc/x86_64-linux-gnu/5/../../../x86_64-linux-gnu/:/usr/lib/gcc/x86_64-linux-gnu/5/../../../../lib/:/lib/x86_64-linux-gnu/:/lib/../lib/:/usr/lib/x86_64-linux-gnu/:/usr/lib/../lib/:./:/usr/local/cuda-8.0/lib64/:/usr/lib/gcc/x86_64-linux-gnu/5/../../../:/lib/:/usr/lib/
+COLLECT_GCC_OPTIONS='-v' '-o' 'cmTC_319a7' '-rdynamic' '-mtune=generic' '-march=x86-64'
+ /usr/lib/gcc/x86_64-linux-gnu/5/collect2 -plugin /usr/lib/gcc/x86_64-linux-gnu/5/liblto_plugin.so -plugin-opt=/usr/lib/gcc/x86_64-linux-gnu/5/lto-wrapper -plugin-opt=-fresolution=/tmp/ccFkJR6h.res -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s --sysroot=/ --build-id --eh-frame-hdr -m elf_x86_64 --hash-style=gnu --as-needed -export-dynamic -dynamic-linker /lib64/ld-linux-x86-64.so.2 -z relro -o cmTC_319a7 /usr/lib/gcc/x86_64-linux-gnu/5/../../../x86_64-linux-gnu/crt1.o /usr/lib/gcc/x86_64-linux-gnu/5/../../../x86_64-linux-gnu/crti.o /usr/lib/gcc/x86_64-linux-gnu/5/crtbegin.o -L/usr/lib/gcc/x86_64-linux-gnu/5 -L/usr/lib/gcc/x86_64-linux-gnu/5/../../../x86_64-linux-gnu -L/usr/lib/gcc/x86_64-linux-gnu/5/../../../../lib -L/lib/x86_64-linux-gnu -L/lib/../lib -L/usr/lib/x86_64-linux-gnu -L/usr/lib/../lib -L. -L/usr/local/cuda-8.0/lib64 -L/usr/lib/gcc/x86_64-linux-gnu/5/../../.. CMakeFiles/cmTC_319a7.dir/CMakeCCompilerABI.c.o -lgcc --as-needed -lgcc_s --no-as-needed -lc -lgcc --as-needed -lgcc_s --no-as-needed /usr/lib/gcc/x86_64-linux-gnu/5/crtend.o /usr/lib/gcc/x86_64-linux-gnu/5/../../../x86_64-linux-gnu/crtn.o
+make[1]: Leaving directory '/data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp'
+
+
+Parsed C implicit link information from above output:
+  link line regex: [^( *|.*[/\])(ld|([^/\]+-)?ld|collect2)[^/\]*( |$)]
+  ignore line: [Change Dir: /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp]
+  ignore line: []
+  ignore line: [Run Build Command:"/usr/bin/make" "cmTC_319a7/fast"]
+  ignore line: [/usr/bin/make -f CMakeFiles/cmTC_319a7.dir/build.make CMakeFiles/cmTC_319a7.dir/build]
+  ignore line: [make[1]: Entering directory '/data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp']
+  ignore line: [Building C object CMakeFiles/cmTC_319a7.dir/CMakeCCompilerABI.c.o]
+  ignore line: [/usr/bin/cc     -o CMakeFiles/cmTC_319a7.dir/CMakeCCompilerABI.c.o   -c /usr/share/cmake-3.5/Modules/CMakeCCompilerABI.c]
+  ignore line: [Linking C executable cmTC_319a7]
+  ignore line: [/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_319a7.dir/link.txt --verbose=1]
+  ignore line: [/usr/bin/cc      -v CMakeFiles/cmTC_319a7.dir/CMakeCCompilerABI.c.o  -o cmTC_319a7 -rdynamic  ]
+  ignore line: [Using built-in specs.]
+  ignore line: [COLLECT_GCC=/usr/bin/cc]
+  ignore line: [COLLECT_LTO_WRAPPER=/usr/lib/gcc/x86_64-linux-gnu/5/lto-wrapper]
+  ignore line: [Target: x86_64-linux-gnu]
+  ignore line: [Configured with: ../src/configure -v --with-pkgversion='Ubuntu 5.4.0-6ubuntu1~16.04.12' --with-bugurl=file:///usr/share/doc/gcc-5/README.Bugs --enable-languages=c,ada,c++,java,go,d,fortran,objc,obj-c++ --prefix=/usr --program-suffix=-5 --enable-shared --enable-linker-build-id --libexecdir=/usr/lib --without-included-gettext --enable-threads=posix --libdir=/usr/lib --enable-nls --with-sysroot=/ --enable-clocale=gnu --enable-libstdcxx-debug --enable-libstdcxx-time=yes --with-default-libstdcxx-abi=new --enable-gnu-unique-object --disable-vtable-verify --enable-libmpx --enable-plugin --with-system-zlib --disable-browser-plugin --enable-java-awt=gtk --enable-gtk-cairo --with-java-home=/usr/lib/jvm/java-1.5.0-gcj-5-amd64/jre --enable-java-home --with-jvm-root-dir=/usr/lib/jvm/java-1.5.0-gcj-5-amd64 --with-jvm-jar-dir=/usr/lib/jvm-exports/java-1.5.0-gcj-5-amd64 --with-arch-directory=amd64 --with-ecj-jar=/usr/share/java/eclipse-ecj.jar --enable-objc-gc --enable-multiarch --disable-werror --with-arch-32=i686 --with-abi=m64 --with-multilib-list=m32,m64,mx32 --enable-multilib --with-tune=generic --enable-checking=release --build=x86_64-linux-gnu --host=x86_64-linux-gnu --target=x86_64-linux-gnu]
+  ignore line: [Thread model: posix]
+  ignore line: [gcc version 5.4.0 20160609 (Ubuntu 5.4.0-6ubuntu1~16.04.12) ]
+  ignore line: [COMPILER_PATH=/usr/lib/gcc/x86_64-linux-gnu/5/:/usr/lib/gcc/x86_64-linux-gnu/5/:/usr/lib/gcc/x86_64-linux-gnu/:/usr/lib/gcc/x86_64-linux-gnu/5/:/usr/lib/gcc/x86_64-linux-gnu/]
+  ignore line: [LIBRARY_PATH=/usr/lib/gcc/x86_64-linux-gnu/5/:/usr/lib/gcc/x86_64-linux-gnu/5/../../../x86_64-linux-gnu/:/usr/lib/gcc/x86_64-linux-gnu/5/../../../../lib/:/lib/x86_64-linux-gnu/:/lib/../lib/:/usr/lib/x86_64-linux-gnu/:/usr/lib/../lib/:./:/usr/local/cuda-8.0/lib64/:/usr/lib/gcc/x86_64-linux-gnu/5/../../../:/lib/:/usr/lib/]
+  ignore line: [COLLECT_GCC_OPTIONS='-v' '-o' 'cmTC_319a7' '-rdynamic' '-mtune=generic' '-march=x86-64']
+  link line: [ /usr/lib/gcc/x86_64-linux-gnu/5/collect2 -plugin /usr/lib/gcc/x86_64-linux-gnu/5/liblto_plugin.so -plugin-opt=/usr/lib/gcc/x86_64-linux-gnu/5/lto-wrapper -plugin-opt=-fresolution=/tmp/ccFkJR6h.res -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s --sysroot=/ --build-id --eh-frame-hdr -m elf_x86_64 --hash-style=gnu --as-needed -export-dynamic -dynamic-linker /lib64/ld-linux-x86-64.so.2 -z relro -o cmTC_319a7 /usr/lib/gcc/x86_64-linux-gnu/5/../../../x86_64-linux-gnu/crt1.o /usr/lib/gcc/x86_64-linux-gnu/5/../../../x86_64-linux-gnu/crti.o /usr/lib/gcc/x86_64-linux-gnu/5/crtbegin.o -L/usr/lib/gcc/x86_64-linux-gnu/5 -L/usr/lib/gcc/x86_64-linux-gnu/5/../../../x86_64-linux-gnu -L/usr/lib/gcc/x86_64-linux-gnu/5/../../../../lib -L/lib/x86_64-linux-gnu -L/lib/../lib -L/usr/lib/x86_64-linux-gnu -L/usr/lib/../lib -L. -L/usr/local/cuda-8.0/lib64 -L/usr/lib/gcc/x86_64-linux-gnu/5/../../.. CMakeFiles/cmTC_319a7.dir/CMakeCCompilerABI.c.o -lgcc --as-needed -lgcc_s --no-as-needed -lc -lgcc --as-needed -lgcc_s --no-as-needed /usr/lib/gcc/x86_64-linux-gnu/5/crtend.o /usr/lib/gcc/x86_64-linux-gnu/5/../../../x86_64-linux-gnu/crtn.o]
+    arg [/usr/lib/gcc/x86_64-linux-gnu/5/collect2] ==> ignore
+    arg [-plugin] ==> ignore
+    arg [/usr/lib/gcc/x86_64-linux-gnu/5/liblto_plugin.so] ==> ignore
+    arg [-plugin-opt=/usr/lib/gcc/x86_64-linux-gnu/5/lto-wrapper] ==> ignore
+    arg [-plugin-opt=-fresolution=/tmp/ccFkJR6h.res] ==> ignore
+    arg [-plugin-opt=-pass-through=-lgcc] ==> ignore
+    arg [-plugin-opt=-pass-through=-lgcc_s] ==> ignore
+    arg [-plugin-opt=-pass-through=-lc] ==> ignore
+    arg [-plugin-opt=-pass-through=-lgcc] ==> ignore
+    arg [-plugin-opt=-pass-through=-lgcc_s] ==> ignore
+    arg [--sysroot=/] ==> ignore
+    arg [--build-id] ==> ignore
+    arg [--eh-frame-hdr] ==> ignore
+    arg [-m] ==> ignore
+    arg [elf_x86_64] ==> ignore
+    arg [--hash-style=gnu] ==> ignore
+    arg [--as-needed] ==> ignore
+    arg [-export-dynamic] ==> ignore
+    arg [-dynamic-linker] ==> ignore
+    arg [/lib64/ld-linux-x86-64.so.2] ==> ignore
+    arg [-zrelro] ==> ignore
+    arg [-o] ==> ignore
+    arg [cmTC_319a7] ==> ignore
+    arg [/usr/lib/gcc/x86_64-linux-gnu/5/../../../x86_64-linux-gnu/crt1.o] ==> ignore
+    arg [/usr/lib/gcc/x86_64-linux-gnu/5/../../../x86_64-linux-gnu/crti.o] ==> ignore
+    arg [/usr/lib/gcc/x86_64-linux-gnu/5/crtbegin.o] ==> ignore
+    arg [-L/usr/lib/gcc/x86_64-linux-gnu/5] ==> dir [/usr/lib/gcc/x86_64-linux-gnu/5]
+    arg [-L/usr/lib/gcc/x86_64-linux-gnu/5/../../../x86_64-linux-gnu] ==> dir [/usr/lib/gcc/x86_64-linux-gnu/5/../../../x86_64-linux-gnu]
+    arg [-L/usr/lib/gcc/x86_64-linux-gnu/5/../../../../lib] ==> dir [/usr/lib/gcc/x86_64-linux-gnu/5/../../../../lib]
+    arg [-L/lib/x86_64-linux-gnu] ==> dir [/lib/x86_64-linux-gnu]
+    arg [-L/lib/../lib] ==> dir [/lib/../lib]
+    arg [-L/usr/lib/x86_64-linux-gnu] ==> dir [/usr/lib/x86_64-linux-gnu]
+    arg [-L/usr/lib/../lib] ==> dir [/usr/lib/../lib]
+    arg [-L.] ==> ignore
+    arg [-L/usr/local/cuda-8.0/lib64] ==> dir [/usr/local/cuda-8.0/lib64]
+    arg [-L/usr/lib/gcc/x86_64-linux-gnu/5/../../..] ==> dir [/usr/lib/gcc/x86_64-linux-gnu/5/../../..]
+    arg [CMakeFiles/cmTC_319a7.dir/CMakeCCompilerABI.c.o] ==> ignore
+    arg [-lgcc] ==> lib [gcc]
+    arg [--as-needed] ==> ignore
+    arg [-lgcc_s] ==> lib [gcc_s]
+    arg [--no-as-needed] ==> ignore
+    arg [-lc] ==> lib [c]
+    arg [-lgcc] ==> lib [gcc]
+    arg [--as-needed] ==> ignore
+    arg [-lgcc_s] ==> lib [gcc_s]
+    arg [--no-as-needed] ==> ignore
+    arg [/usr/lib/gcc/x86_64-linux-gnu/5/crtend.o] ==> ignore
+    arg [/usr/lib/gcc/x86_64-linux-gnu/5/../../../x86_64-linux-gnu/crtn.o] ==> ignore
+  remove lib [gcc]
+  remove lib [gcc_s]
+  remove lib [gcc]
+  remove lib [gcc_s]
+  collapse library dir [/usr/lib/gcc/x86_64-linux-gnu/5] ==> [/usr/lib/gcc/x86_64-linux-gnu/5]
+  collapse library dir [/usr/lib/gcc/x86_64-linux-gnu/5/../../../x86_64-linux-gnu] ==> [/usr/lib/x86_64-linux-gnu]
+  collapse library dir [/usr/lib/gcc/x86_64-linux-gnu/5/../../../../lib] ==> [/usr/lib]
+  collapse library dir [/lib/x86_64-linux-gnu] ==> [/lib/x86_64-linux-gnu]
+  collapse library dir [/lib/../lib] ==> [/lib]
+  collapse library dir [/usr/lib/x86_64-linux-gnu] ==> [/usr/lib/x86_64-linux-gnu]
+  collapse library dir [/usr/lib/../lib] ==> [/usr/lib]
+  collapse library dir [/usr/local/cuda-8.0/lib64] ==> [/usr/local/cuda-8.0/lib64]
+  collapse library dir [/usr/lib/gcc/x86_64-linux-gnu/5/../../..] ==> [/usr/lib]
+  implicit libs: [c]
+  implicit dirs: [/usr/lib/gcc/x86_64-linux-gnu/5;/usr/lib/x86_64-linux-gnu;/usr/lib;/lib/x86_64-linux-gnu;/lib;/usr/local/cuda-8.0/lib64]
+  implicit fwks: []
+
+
+
+
+Detecting C [-std=c11] compiler features compiled with the following output:
+Change Dir: /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_2f937/fast"
+/usr/bin/make -f CMakeFiles/cmTC_2f937.dir/build.make CMakeFiles/cmTC_2f937.dir/build
+make[1]: Entering directory '/data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_2f937.dir/feature_tests.c.o
+/usr/bin/cc    -std=c11 -o CMakeFiles/cmTC_2f937.dir/feature_tests.c.o   -c /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/feature_tests.c
+Linking C executable cmTC_2f937
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_2f937.dir/link.txt --verbose=1
+/usr/bin/cc       CMakeFiles/cmTC_2f937.dir/feature_tests.c.o  -o cmTC_2f937 -rdynamic 
+make[1]: Leaving directory '/data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp'
+
+
+    Feature record: C_FEATURE:1c_function_prototypes
+    Feature record: C_FEATURE:1c_restrict
+    Feature record: C_FEATURE:1c_static_assert
+    Feature record: C_FEATURE:1c_variadic_macros
+
+
+Detecting C [-std=c99] compiler features compiled with the following output:
+Change Dir: /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_96dcc/fast"
+/usr/bin/make -f CMakeFiles/cmTC_96dcc.dir/build.make CMakeFiles/cmTC_96dcc.dir/build
+make[1]: Entering directory '/data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_96dcc.dir/feature_tests.c.o
+/usr/bin/cc    -std=c99 -o CMakeFiles/cmTC_96dcc.dir/feature_tests.c.o   -c /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/feature_tests.c
+Linking C executable cmTC_96dcc
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_96dcc.dir/link.txt --verbose=1
+/usr/bin/cc       CMakeFiles/cmTC_96dcc.dir/feature_tests.c.o  -o cmTC_96dcc -rdynamic 
+make[1]: Leaving directory '/data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp'
+
+
+    Feature record: C_FEATURE:1c_function_prototypes
+    Feature record: C_FEATURE:1c_restrict
+    Feature record: C_FEATURE:0c_static_assert
+    Feature record: C_FEATURE:1c_variadic_macros
+
+
+Detecting C [-std=c90] compiler features compiled with the following output:
+Change Dir: /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_87b77/fast"
+/usr/bin/make -f CMakeFiles/cmTC_87b77.dir/build.make CMakeFiles/cmTC_87b77.dir/build
+make[1]: Entering directory '/data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_87b77.dir/feature_tests.c.o
+/usr/bin/cc    -std=c90 -o CMakeFiles/cmTC_87b77.dir/feature_tests.c.o   -c /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/feature_tests.c
+Linking C executable cmTC_87b77
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_87b77.dir/link.txt --verbose=1
+/usr/bin/cc       CMakeFiles/cmTC_87b77.dir/feature_tests.c.o  -o cmTC_87b77 -rdynamic 
+make[1]: Leaving directory '/data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp'
+
+
+    Feature record: C_FEATURE:1c_function_prototypes
+    Feature record: C_FEATURE:0c_restrict
+    Feature record: C_FEATURE:0c_static_assert
+    Feature record: C_FEATURE:0c_variadic_macros
+Determining if the include file sys/types.h exists passed with the following output:
+Change Dir: /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_122a7/fast"
+/usr/bin/make -f CMakeFiles/cmTC_122a7.dir/build.make CMakeFiles/cmTC_122a7.dir/build
+make[1]: Entering directory '/data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_122a7.dir/CheckIncludeFile.c.o
+/usr/bin/cc     -o CMakeFiles/cmTC_122a7.dir/CheckIncludeFile.c.o   -c /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+Linking C executable cmTC_122a7
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_122a7.dir/link.txt --verbose=1
+/usr/bin/cc       CMakeFiles/cmTC_122a7.dir/CheckIncludeFile.c.o  -o cmTC_122a7 -rdynamic 
+make[1]: Leaving directory '/data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp'
+
+
+Determining if the include file stdint.h exists passed with the following output:
+Change Dir: /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_83af8/fast"
+/usr/bin/make -f CMakeFiles/cmTC_83af8.dir/build.make CMakeFiles/cmTC_83af8.dir/build
+make[1]: Entering directory '/data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_83af8.dir/CheckIncludeFile.c.o
+/usr/bin/cc     -o CMakeFiles/cmTC_83af8.dir/CheckIncludeFile.c.o   -c /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+Linking C executable cmTC_83af8
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_83af8.dir/link.txt --verbose=1
+/usr/bin/cc       CMakeFiles/cmTC_83af8.dir/CheckIncludeFile.c.o  -o cmTC_83af8 -rdynamic 
+make[1]: Leaving directory '/data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp'
+
+
+Determining if the include file stddef.h exists passed with the following output:
+Change Dir: /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_8b3dd/fast"
+/usr/bin/make -f CMakeFiles/cmTC_8b3dd.dir/build.make CMakeFiles/cmTC_8b3dd.dir/build
+make[1]: Entering directory '/data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_8b3dd.dir/CheckIncludeFile.c.o
+/usr/bin/cc     -o CMakeFiles/cmTC_8b3dd.dir/CheckIncludeFile.c.o   -c /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+Linking C executable cmTC_8b3dd
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_8b3dd.dir/link.txt --verbose=1
+/usr/bin/cc       CMakeFiles/cmTC_8b3dd.dir/CheckIncludeFile.c.o  -o cmTC_8b3dd -rdynamic 
+make[1]: Leaving directory '/data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp'
+
+
+Determining size of size_t passed with the following output:
+Change Dir: /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_52624/fast"
+/usr/bin/make -f CMakeFiles/cmTC_52624.dir/build.make CMakeFiles/cmTC_52624.dir/build
+make[1]: Entering directory '/data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_52624.dir/SIZE_T.c.o
+/usr/bin/cc     -o CMakeFiles/cmTC_52624.dir/SIZE_T.c.o   -c /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CheckTypeSize/SIZE_T.c
+Linking C executable cmTC_52624
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_52624.dir/link.txt --verbose=1
+/usr/bin/cc       CMakeFiles/cmTC_52624.dir/SIZE_T.c.o  -o cmTC_52624 -rdynamic 
+make[1]: Leaving directory '/data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp'
+
+
+Determining size of unsigned long passed with the following output:
+Change Dir: /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_1ff17/fast"
+/usr/bin/make -f CMakeFiles/cmTC_1ff17.dir/build.make CMakeFiles/cmTC_1ff17.dir/build
+make[1]: Entering directory '/data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_1ff17.dir/UNSIGNED_LONG.c.o
+/usr/bin/cc     -o CMakeFiles/cmTC_1ff17.dir/UNSIGNED_LONG.c.o   -c /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CheckTypeSize/UNSIGNED_LONG.c
+Linking C executable cmTC_1ff17
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_1ff17.dir/link.txt --verbose=1
+/usr/bin/cc       CMakeFiles/cmTC_1ff17.dir/UNSIGNED_LONG.c.o  -o cmTC_1ff17 -rdynamic 
+make[1]: Leaving directory '/data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp'
+
+
+Performing C SOURCE FILE Test HAVE_BUILTIN_CTZL succeeded with the following output:
+Change Dir: /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_28b33/fast"
+/usr/bin/make -f CMakeFiles/cmTC_28b33.dir/build.make CMakeFiles/cmTC_28b33.dir/build
+make[1]: Entering directory '/data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_28b33.dir/src.c.o
+/usr/bin/cc    -DHAVE_BUILTIN_CTZL   -o CMakeFiles/cmTC_28b33.dir/src.c.o   -c /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp/src.c
+Linking C executable cmTC_28b33
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_28b33.dir/link.txt --verbose=1
+/usr/bin/cc   -DHAVE_BUILTIN_CTZL    CMakeFiles/cmTC_28b33.dir/src.c.o  -o cmTC_28b33 -rdynamic 
+make[1]: Leaving directory '/data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp'
+
+Source file was:
+int main(int argc, char **argv) { unsigned long a = argc;  return __builtin_ctzl(a); }
+Determining if files locale.h exist passed with the following output:
+Change Dir: /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_39121/fast"
+/usr/bin/make -f CMakeFiles/cmTC_39121.dir/build.make CMakeFiles/cmTC_39121.dir/build
+make[1]: Entering directory '/data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_39121.dir/CheckIncludeFiles.c.o
+/usr/bin/cc     -o CMakeFiles/cmTC_39121.dir/CheckIncludeFiles.c.o   -c /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp/CheckIncludeFiles.c
+Linking C executable cmTC_39121
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_39121.dir/link.txt --verbose=1
+/usr/bin/cc       CMakeFiles/cmTC_39121.dir/CheckIncludeFiles.c.o  -o cmTC_39121 -rdynamic 
+make[1]: Leaving directory '/data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp'
+
+
+Determining if files stdlib.h exist passed with the following output:
+Change Dir: /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_051b8/fast"
+/usr/bin/make -f CMakeFiles/cmTC_051b8.dir/build.make CMakeFiles/cmTC_051b8.dir/build
+make[1]: Entering directory '/data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_051b8.dir/CheckIncludeFiles.c.o
+/usr/bin/cc     -o CMakeFiles/cmTC_051b8.dir/CheckIncludeFiles.c.o   -c /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp/CheckIncludeFiles.c
+Linking C executable cmTC_051b8
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_051b8.dir/link.txt --verbose=1
+/usr/bin/cc       CMakeFiles/cmTC_051b8.dir/CheckIncludeFiles.c.o  -o cmTC_051b8 -rdynamic 
+make[1]: Leaving directory '/data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp'
+
+
+Determining if files sys/types.h exist passed with the following output:
+Change Dir: /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_630bb/fast"
+/usr/bin/make -f CMakeFiles/cmTC_630bb.dir/build.make CMakeFiles/cmTC_630bb.dir/build
+make[1]: Entering directory '/data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_630bb.dir/CheckIncludeFiles.c.o
+/usr/bin/cc     -o CMakeFiles/cmTC_630bb.dir/CheckIncludeFiles.c.o   -c /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp/CheckIncludeFiles.c
+Linking C executable cmTC_630bb
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_630bb.dir/link.txt --verbose=1
+/usr/bin/cc       CMakeFiles/cmTC_630bb.dir/CheckIncludeFiles.c.o  -o cmTC_630bb -rdynamic 
+make[1]: Leaving directory '/data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp'
+
+
+Determining if the memset exist passed with the following output:
+Change Dir: /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_f98f1/fast"
+/usr/bin/make -f CMakeFiles/cmTC_f98f1.dir/build.make CMakeFiles/cmTC_f98f1.dir/build
+make[1]: Entering directory '/data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_f98f1.dir/CheckSymbolExists.c.o
+/usr/bin/cc     -o CMakeFiles/cmTC_f98f1.dir/CheckSymbolExists.c.o   -c /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+Linking C executable cmTC_f98f1
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_f98f1.dir/link.txt --verbose=1
+/usr/bin/cc       CMakeFiles/cmTC_f98f1.dir/CheckSymbolExists.c.o  -o cmTC_f98f1 -rdynamic 
+make[1]: Leaving directory '/data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp'
+
+File /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <string.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef memset
+  return ((int*)(&memset))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+
+Determining if the memcpy exist passed with the following output:
+Change Dir: /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_130a9/fast"
+/usr/bin/make -f CMakeFiles/cmTC_130a9.dir/build.make CMakeFiles/cmTC_130a9.dir/build
+make[1]: Entering directory '/data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_130a9.dir/CheckSymbolExists.c.o
+/usr/bin/cc     -o CMakeFiles/cmTC_130a9.dir/CheckSymbolExists.c.o   -c /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+Linking C executable cmTC_130a9
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_130a9.dir/link.txt --verbose=1
+/usr/bin/cc       CMakeFiles/cmTC_130a9.dir/CheckSymbolExists.c.o  -o cmTC_130a9 -rdynamic 
+make[1]: Leaving directory '/data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp'
+
+File /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <string.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef memcpy
+  return ((int*)(&memcpy))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+
+Determining size of unsigned char passed with the following output:
+Change Dir: /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_fb94b/fast"
+/usr/bin/make -f CMakeFiles/cmTC_fb94b.dir/build.make CMakeFiles/cmTC_fb94b.dir/build
+make[1]: Entering directory '/data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_fb94b.dir/UNSIGNED_CHAR.c.o
+/usr/bin/cc     -o CMakeFiles/cmTC_fb94b.dir/UNSIGNED_CHAR.c.o   -c /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CheckTypeSize/UNSIGNED_CHAR.c
+Linking C executable cmTC_fb94b
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_fb94b.dir/link.txt --verbose=1
+/usr/bin/cc       CMakeFiles/cmTC_fb94b.dir/UNSIGNED_CHAR.c.o  -o cmTC_fb94b -rdynamic 
+make[1]: Leaving directory '/data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp'
+
+
+Determining size of unsigned short passed with the following output:
+Change Dir: /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_660c5/fast"
+/usr/bin/make -f CMakeFiles/cmTC_660c5.dir/build.make CMakeFiles/cmTC_660c5.dir/build
+make[1]: Entering directory '/data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_660c5.dir/UNSIGNED_SHORT.c.o
+/usr/bin/cc     -o CMakeFiles/cmTC_660c5.dir/UNSIGNED_SHORT.c.o   -c /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CheckTypeSize/UNSIGNED_SHORT.c
+Linking C executable cmTC_660c5
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_660c5.dir/link.txt --verbose=1
+/usr/bin/cc       CMakeFiles/cmTC_660c5.dir/UNSIGNED_SHORT.c.o  -o cmTC_660c5 -rdynamic 
+make[1]: Leaving directory '/data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp'
+
+
+Performing C SOURCE FILE Test INCOMPLETE_TYPES succeeded with the following output:
+Change Dir: /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_bec0d/fast"
+/usr/bin/make -f CMakeFiles/cmTC_bec0d.dir/build.make CMakeFiles/cmTC_bec0d.dir/build
+make[1]: Entering directory '/data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_bec0d.dir/src.c.o
+/usr/bin/cc    -DINCOMPLETE_TYPES   -o CMakeFiles/cmTC_bec0d.dir/src.c.o   -c /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp/src.c
+Linking C executable cmTC_bec0d
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_bec0d.dir/link.txt --verbose=1
+/usr/bin/cc   -DINCOMPLETE_TYPES    CMakeFiles/cmTC_bec0d.dir/src.c.o  -o cmTC_bec0d -rdynamic 
+make[1]: Leaving directory '/data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp'
+
+Source file was:
+int main(void) { typedef struct undefined_structure *undef_struct_ptr;  undef_struct_ptr ptr = 0;  return ptr != 0; }
+Performing C SOURCE FILE Test INLINE_WORKS succeeded with the following output:
+Change Dir: /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_28a5e/fast"
+/usr/bin/make -f CMakeFiles/cmTC_28a5e.dir/build.make CMakeFiles/cmTC_28a5e.dir/build
+make[1]: Entering directory '/data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_28a5e.dir/src.c.o
+/usr/bin/cc    -DINLINE_WORKS   -o CMakeFiles/cmTC_28a5e.dir/src.c.o   -c /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp/src.c
+Linking C executable cmTC_28a5e
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_28a5e.dir/link.txt --verbose=1
+/usr/bin/cc   -DINLINE_WORKS    CMakeFiles/cmTC_28a5e.dir/src.c.o  -o cmTC_28a5e -rdynamic 
+make[1]: Leaving directory '/data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp'
+
+Source file was:
+__inline__ __attribute__((always_inline)) static int foo(void) { return 0; } int main(void) { return foo(); }
+Performing C SOURCE FILE Test HAVE_THREAD_LOCAL succeeded with the following output:
+Change Dir: /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_c2fca/fast"
+/usr/bin/make -f CMakeFiles/cmTC_c2fca.dir/build.make CMakeFiles/cmTC_c2fca.dir/build
+make[1]: Entering directory '/data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_c2fca.dir/src.c.o
+/usr/bin/cc    -DHAVE_THREAD_LOCAL   -o CMakeFiles/cmTC_c2fca.dir/src.c.o   -c /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp/src.c
+Linking C executable cmTC_c2fca
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_c2fca.dir/link.txt --verbose=1
+/usr/bin/cc   -DHAVE_THREAD_LOCAL    CMakeFiles/cmTC_c2fca.dir/src.c.o  -o cmTC_c2fca -rdynamic 
+make[1]: Leaving directory '/data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp'
+
+Source file was:
+__thread int i;  int main(void) { i = 0;  return i; }
+Performing C SOURCE FILE Test HAVE_VERSION_SCRIPT succeeded with the following output:
+Change Dir: /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_4ad2b/fast"
+/usr/bin/make -f CMakeFiles/cmTC_4ad2b.dir/build.make CMakeFiles/cmTC_4ad2b.dir/build
+make[1]: Entering directory '/data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_4ad2b.dir/src.c.o
+/usr/bin/cc    -DHAVE_VERSION_SCRIPT -Wl,--version-script,/home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/conftest.map   -o CMakeFiles/cmTC_4ad2b.dir/src.c.o   -c /home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp/src.c
+Linking C executable cmTC_4ad2b
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_4ad2b.dir/link.txt --verbose=1
+/usr/bin/cc   -DHAVE_VERSION_SCRIPT -Wl,--version-script,/home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/conftest.map    CMakeFiles/cmTC_4ad2b.dir/src.c.o  -o cmTC_4ad2b -rdynamic 
+make[1]: Leaving directory '/data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/CMakeFiles/CMakeTmp'
+
+Source file was:
+int main(void) { return 0; }
+Looking for a ASM_NASM compiler passed with the following output:
+-- The ASM_NASM compiler identification is unknown
+-- Found assembler: /usr/bin/nasm
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /data/d/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/build/simd/CMakeFiles/CheckASM_NASM
+

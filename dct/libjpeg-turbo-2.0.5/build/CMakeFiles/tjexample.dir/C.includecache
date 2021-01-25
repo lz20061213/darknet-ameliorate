@@ -1,0 +1,22 @@
+#IncludeRegexLine: ^[ 	]*#[ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+..//turbojpeg.h
+
+/home/liuzhuang/codes/darknet-ameliorate/dct/libjpeg-turbo-2.0.5/tjexample.c
+stdio.h
+-
+stdlib.h
+-
+string.h
+-
+errno.h
+-
+turbojpeg.h
+-
+
