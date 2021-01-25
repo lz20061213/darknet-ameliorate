@@ -21,11 +21,13 @@ void scale_gamma(network* net, float alpha) {
     }
 }
 
-void train_detector(char *datacfg, char *cfgfile, char *weightfile, int *gpus, int ngpus, int clear)
+void train_detector(char *datacfg, char *cfgfile, char *weightfile, char *backup_directory, int *gpus, int ngpus, int clear)
 {
     list *options = read_data_cfg(datacfg);
     char *train_images = option_find_str(options, "train", "data/train.list");
-    char *backup_directory = option_find_str(options, "backup", "/backup/");
+    if (!backup_directory) {
+        backup_directory = option_find_str(options, "backup", "/backup/");
+    }
 
     srand(time(0));
     char *base = basecfg(cfgfile);
@@ -235,11 +237,13 @@ void train_detector(char *datacfg, char *cfgfile, char *weightfile, int *gpus, i
     save_weights(net, buff);
 }
 
-void mimic_train_detector(char *datacfg, char *s_cfgfile, char *s_weightfile, char *t_cfgfile, char *t_weightfile,
+void mimic_train_detector(char *datacfg, char *s_cfgfile, char *s_weightfile, char *backup_directory, char *t_cfgfile, char *t_weightfile,
                           int *tgpus, int *sgpus, int ngpus, int clear) {
     list *options = read_data_cfg(datacfg);
     char *train_images = option_find_str(options, "train", "data/train.list");
-    char *backup_directory = option_find_str(options, "backup", "/backup/");
+    if (!backup_directory) {
+        backup_directory = option_find_str(options, "backup", "/backup/");
+    }
 
     // initialize teacher net
 
@@ -306,6 +310,9 @@ void mimic_train_detector(char *datacfg, char *s_cfgfile, char *s_weightfile, ch
     //args.type = INSTANCE_DATA;
     args.threads = 64;
 
+    int init_w = snet->w;
+    int init_h = snet->h;
+
     pthread_t load_thread = load_data(args);
     double time;
     int count = 0;
@@ -313,12 +320,17 @@ void mimic_train_detector(char *datacfg, char *s_cfgfile, char *s_weightfile, ch
     while (get_current_batch(snet) < snet->max_batches) {
         if (l.random && count++ % 10 == 0) {
             printf("Resizing\n");
-            int dim = (rand() % 10 + 10) * 32;
-            if (get_current_batch(snet) + 200 > snet->max_batches) dim = 608;
+            int randi = rand_int(-5, 10);
+            int dim_w = randi * snet->downsample_scale + init_w;
+            int dim_h = randi * snet->downsample_scale + init_h;
+            if (get_current_batch(snet)+200 > snet->max_batches) {
+                dim_w = 10 * snet->downsample_scale + init_w;
+                dim_h = 10 * snet->downsample_scale + init_h;
+            }
             //int dim = (rand() % 4 + 16) * 32;
-            printf("%d\n", dim);
-            args.w = dim;
-            args.h = dim;
+            printf("input: %d %d\n", dim_w, dim_h);
+            args.w = dim_w;
+            args.h = dim_h;
 
             pthread_join(load_thread, 0);
             train = buffer;
@@ -328,9 +340,9 @@ void mimic_train_detector(char *datacfg, char *s_cfgfile, char *s_weightfile, ch
 #pragma omp parallel for
             for (i = 0; i < ngpus; ++i) {
                 //printf("resize snet\n");
-                resize_network(snets[i], dim, dim);
+                resize_network(snets[i], dim_w, dim_h);
                 //printf("resize tnet\n");
-                resize_network(tnets[i], dim, dim);
+                resize_network(tnets[i], dim_w, dim_h);
             }
             snet = snets[0];
             tnet = tnets[0];
@@ -412,11 +424,13 @@ void mimic_train_detector(char *datacfg, char *s_cfgfile, char *s_weightfile, ch
 
 }
 
-void mutual_train_detector(char *datacfg, char *s_cfgfile, char *s_weightfile, char *p_cfgfile, char *p_weightfile,
+void mutual_train_detector(char *datacfg, char *s_cfgfile, char *s_weightfile, char *backup_directory, char *p_cfgfile, char *p_weightfile,
                           int *pgpus, int *sgpus, int ngpus, int clear) {
     list *options = read_data_cfg(datacfg);
     char *train_images = option_find_str(options, "train", "data/train.list");
-    char *backup_directory = option_find_str(options, "backup", "/backup/");
+    if (!backup_directory) {
+        backup_directory = option_find_str(options, "backup", "/backup/");
+    }
 
     // initialize student net and its peer net
     srand(time(0));
@@ -488,18 +502,26 @@ void mutual_train_detector(char *datacfg, char *s_cfgfile, char *s_weightfile, c
     //args.type = INSTANCE_DATA;
     args.threads = 64;
 
+    int init_w = snet->w;
+    int init_h = snet->h;
+
     pthread_t load_thread = load_data(args);
     double time;
     int count = 0;
     while (get_current_batch(snet) < snet->max_batches) {
         if (l.random && count++ % 10 == 0) {
             printf("Resizing\n");
-            int dim = (rand() % 10 + 10) * 32;
-            if (get_current_batch(snet) + 200 > snet->max_batches) dim = 608;
+            int randi = rand_int(-5, 10);
+            int dim_w = randi * snet->downsample_scale + init_w;
+            int dim_h = randi * snet->downsample_scale + init_h;
+            if (get_current_batch(snet)+200 > snet->max_batches) {
+                dim_w = 10 * snet->downsample_scale + init_w;
+                dim_h = 10 * snet->downsample_scale + init_h;
+            }
             //int dim = (rand() % 4 + 16) * 32;
-            printf("%d\n", dim);
-            args.w = dim;
-            args.h = dim;
+            printf("input: %d %d\n", dim_w, dim_h);
+            args.w = dim_w;
+            args.h = dim_h;
 
             pthread_join(load_thread, 0);
             train = buffer;
@@ -508,7 +530,8 @@ void mutual_train_detector(char *datacfg, char *s_cfgfile, char *s_weightfile, c
 
 #pragma omp parallel for
             for (i = 0; i < ngpus; ++i) {
-                resize_network(snets[i], dim, dim);
+                resize_network(snets[i], dim_w, dim_h);
+                resize_network(pnets[i], dim_w, dim_h);
             }
             snet = snets[0];
         }
@@ -1184,6 +1207,8 @@ void statistic_detector(char *datacfg, char *cfgfile, char *weightfile) {
             char *path = paths[i+t-nthreads];
             char *id = path;  // modify basecfg(path) -> path
             float *X = val_resized[t].data;
+            net->file_id = i+t-nthreads;
+            //printf("id: %d\n", net->file_id);
             if(net->post_training_quantization) fprintf(net->filewriter_fl, "%s\n", id);
             if(!net->quantize || net->quantization_aware_training) fprintf(net->filewriter_features, "%s\n", id);
             //printf("before predict\n");
@@ -2081,13 +2106,14 @@ void run_detector(int argc, char **argv)
     char *cfg = argv[4];
     char *weights = (argc > 5) ? argv[5] : 0;
     char *filename = (argc > 6) ? argv[6]: 0;
+    char *backup_directory = (argc > 6) ? argv[6] : 0;
 
     float iou_thresh = find_float_arg(argc, argv, "-iou_thresh", .5);    // 0.5 for mAP
     int map_points = find_int_arg(argc, argv, "-points", 0);
     int letter_box = find_int_arg(argc, argv, "-letter_box", 1);
 
     if(0==strcmp(argv[2], "test")) test_detector(datacfg, cfg, weights, filename, thresh, hier_thresh, outfile, fullscreen);
-    else if(0==strcmp(argv[2], "train")) train_detector(datacfg, cfg, weights, gpus, ngpus, clear);
+    else if(0==strcmp(argv[2], "train")) train_detector(datacfg, cfg, weights, backup_directory, gpus, ngpus, clear);
     else if(0==strcmp(argv[2], "valid")) validate_detector(datacfg, cfg, weights, outfile);
     else if(0==strcmp(argv[2], "valid2")) validate_detector_flip(datacfg, cfg, weights, outfile);
     else if(0==strcmp(argv[2], "recall")) validate_detector_recall(cfg, weights);
@@ -2119,14 +2145,14 @@ void run_detector(int argc, char **argv)
             teacher_gpus[i] = gpu_id;
         }
 
-        mimic_train_detector(datacfg, cfg, weights, teacher_cfg, teacher_weights, teacher_gpus, gpus, ngpus, clear);
+        mimic_train_detector(datacfg, cfg, weights, backup_directory, teacher_cfg, teacher_weights, teacher_gpus, gpus, ngpus, clear);
     }
     else if (0 == strcmp(argv[2], "mutual_train")) {
         list *options = read_data_cfg(datacfg);
 
         // here we can use different peer network todo
-        char *peer_cfg = option_find_str(options, "peer_cfgfile", "cfg/resnet18.cfg");
-        char *peer_weights = option_find_str(options, "peer_weightfile", "resnet18.weights");
+        char *peer_cfg = option_find_str(options, "peer_cfgfile", "");
+        char *peer_weights = option_find_str(options, "peer_weightfile", "");
 
         char *l = option_find_str(options, "peer_gpu", "-1,-1,-1,-1");
         int len = strlen(l);
@@ -2142,7 +2168,7 @@ void run_detector(int argc, char **argv)
             peer_gpus[i] = gpu_id;
         }
 
-        mutual_train_detector(datacfg, cfg, weights, peer_cfg, peer_weights, peer_gpus, gpus, ngpus, clear);
+        mutual_train_detector(datacfg, cfg, weights, backup_directory, peer_cfg, peer_weights, peer_gpus, gpus, ngpus, clear);
     }
     else if (0 == strcmp(argv[2], "mimicutual_train")) {
         list *options = read_data_cfg(datacfg);

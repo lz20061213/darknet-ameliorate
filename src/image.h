@@ -62,6 +62,10 @@ void copy_image_into(image src, image dest);
 
 image get_image_layer(image m, int l);
 
+typedef unsigned char uint8_t;
+void rgbgr_chwhc(float *input, uint8_t *output, int h, int w, int c);
+void whchw(float *input, float *output, int h, int w, int c);
+
 #ifdef __cplusplus
 }
 #endif

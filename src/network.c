@@ -36,6 +36,7 @@
 #include "shortcut_layer.h"
 #include "parser.h"
 #include "data.h"
+#include "bgr2dct.h"
 
 load_args get_base_args(network *net)
 {
@@ -379,9 +380,17 @@ void backward_network(network *netp)
 // penalty for slimming sparse scale
 // there maybe some question
 void updateBN(network *net) {
+
+    size_t batch_num = get_current_batch(net);
+    if(batch_num < net->slimming_start_batch) return;
     int i, j;
     int *penalty = calloc(net->n, sizeof(int));
     memset(penalty, 0, net->n * sizeof(int));
+
+    if(net->poly_slimming) {
+        net->slimming_scale = net->slimming_min_scale + (float)(batch_num - net->slimming_start_batch) / (net->max_batches - net->slimming_start_batch) * (net->slimming_max_scale - net->slimming_min_scale);
+    }
+
     if (net->consistent_slimming) {
         i = net->n;
         while (i>=0) {
@@ -440,6 +449,8 @@ void updateBN(network *net) {
             add_l1_delta_gpu(l.out_c, -net->slimming_scale, l.scales_gpu, l.scale_updates_gpu);
         }
     }
+
+    free(penalty);
 }
 
 float train_network_datum(network *net)
@@ -533,6 +544,36 @@ float train_network(network *net, data d)
         }
     }
 
+    if (net->transfer_todct) {
+        data dct = {0};
+        d.X.rows = d.X.rows;
+        d.X.vals = calloc(d.X.rows, sizeof(float*));
+        d.X.cols = net->h * net->w / 2;  // /8 * /8 * 32
+        for(i = 0; i < d.X.rows; ++i) {
+            DCT dct_outputs;
+            // 1. convert 0~1 to 0~255
+            scal_cpu_int(d.X.cols, 255.0, d.X.vals[i], 1);
+            // 2. rgb to bgr, and chw to hwc
+            uint8_t *bgr_image = calloc(d.X.cols, sizeof(uint8_t));
+            // 3. bgr to dct
+            rgbgr_chwhc(d.X.vals[i], bgr_image, net->h, net->w, net->c);
+            free(bgr_image);
+            // 4. scale dct / 8
+            float *dct_data = calloc(dct.X.cols, sizeof(float));
+            short2float(dct_outputs.data, dct_data, dct.X.cols);
+            free(dct_outputs.data);
+            dct.X.vals[i] = dct_data;
+            scal_cpu_int(dct.X.cols, 1.0/8, dct.X.vals[i], 1);
+        }
+        d.X.rows = dct.X.rows;
+        d.X.cols = dct.X.cols;
+        for (i = 0; i < d.X.rows; ++i) {
+            d.X.vals[i] = realloc(d.X.vals[i], d.X.cols*sizeof(float));
+            whchw(dct.X.vals[i], d.X.vals[i], net->h / 8, net->w / 8, 32);
+        }
+        free_data(dct);
+    }
+
     float sum = 0;
     for(i = 0; i < n; ++i){
         get_next_batch(d, batch, i*batch, net->input, net->truth);
@@ -548,6 +589,13 @@ float mimic_train_network(network *netp, network *netq, data d) {
     int n = d.X.rows / batch;
 
     int i;
+    if (netp->transfer_input) {
+        for (i = 0; i < d.X.rows; ++i) {
+            scal_cpu_int(d.X.cols, 255.0, d.X.vals[i], 1);
+            add_cpu(d.X.cols, -128, d.X.vals[i], 1);
+        }
+    }
+
     float sum = 0;
     for (i = 0; i < n; ++i) {
         get_next_batch(d, batch, i * batch, netp->input, netp->truth);
@@ -564,6 +612,12 @@ mutual_error mutual_train_network(network *netp, network *netq, data d) {
     int n = d.X.rows / batch;
 
     int i;
+    if (netp->transfer_input || netq->transfer_input) {
+        for (i = 0; i < d.X.rows; ++i) {
+            scal_cpu_int(d.X.cols, 255.0, d.X.vals[i], 1);
+            add_cpu(d.X.cols, -128, d.X.vals[i], 1);
+        }
+    }
     float sump = 0, sumq = 0;
     mutual_error errs;
     errs.errorp = 0;
@@ -787,10 +841,34 @@ float *network_predict(network *net, float *input)
     net->delta = 0;
 
     int size = net->h*net->w*net->c;
+    int dct_size = net->h*net->w/2;
 
     if (net->transfer_input) {
         scal_cpu_int(size, 255.0, net->input, 1);
         add_cpu(size, -128, net->input, 1);
+    }
+
+    if (net->transfer_todct) {
+        DCT dct_outputs;
+        // 1. convert 0~1 to 0~255
+        scal_cpu_int(size, 255.0, input, 1);
+        // 2. rgb to bgr, and chw to hwc
+        uint8_t *bgr_image = calloc(size, sizeof(uint8_t));
+        rgbgr_chwhc(input, bgr_image, net->h, net->w, net->c);
+        // 3. bgr to dct
+        dct_outputs = bgr2dct(bgr_image, net->w, net->h, net->dct_onlyY);
+        free(bgr_image);
+        // 4. scale dct result
+        float *dct_data = calloc(dct_size, sizeof(float));
+        short2float(dct_outputs.data, dct_data, dct_size);
+        free(dct_outputs.data);
+        scal_cpu_int(dct_size, 1.0/8, dct_data, 1);
+        //free(input);
+        input = realloc(input, dct_size*sizeof(float));
+        whchw(dct_data, input, net->h / 8, net->w / 8, 32);
+        free(dct_data);
+        size = dct_size;
+        net->input = input;
     }
 
     // write input to input.dat
@@ -1086,13 +1164,10 @@ void forward_network_gpu(network *netp)
 {
     network net = *netp;
     cuda_set_device(net.gpu_index);
-//    printf("net input: %f %f %f %f %f\n",
-//            net.input[259582],
-//            net.input[259583],
-//            net.input[259584],
-//            net.input[259585],
-//            net.input[259586]);
-    cuda_push_array(net.input_gpu, net.input, net.inputs*net.batch);
+    int size = net.inputs;
+    if (net.transfer_todct)
+        size = net.layers[0].inputs;
+    cuda_push_array(net.input_gpu, net.input, size*net.batch);
     if(net.truth){
         cuda_push_array(net.truth_gpu, net.truth, net.truths*net.batch);
     }
@@ -1101,7 +1176,7 @@ void forward_network_gpu(network *netp)
     for(i = 0; i < net.n; ++i){
         net.index = i;
         layer l = net.layers[i];
-        l.current_layer_index = i;
+        net.layers[i].current_layer_index = i;
         if(l.delta_gpu){
             fill_gpu(l.outputs * l.batch, 0, l.delta_gpu, 1);
         }

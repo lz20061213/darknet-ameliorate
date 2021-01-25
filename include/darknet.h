@@ -286,6 +286,8 @@ struct layer{
     int onlyforward;
     int stopbackward;
     int dontload;
+    int skipload;
+    int skipfilters;
     int dontsave;
     int dontloadscales;
     int numload;
@@ -581,6 +583,11 @@ typedef struct network{
     float slimming_scale;
     float slimming_alpha;
 
+    float poly_slimming;
+    float slimming_min_scale;
+    float slimming_max_scale;
+    int slimming_start_batch;
+
     int adam;
     float B1;
     float B2;
@@ -657,8 +664,11 @@ typedef struct network{
     int write_yolo_output;
     FILE *filewriter_fl;
     FILE *filewriter_features;
+    int file_id;
 
     int transfer_input;
+    int transfer_todct;
+    int dct_onlyY;
 
     float *delta;
     float *workspace;
@@ -736,7 +746,24 @@ typedef struct{
 } data;
 
 typedef enum {
-    CLASSIFICATION_DATA, DETECTION_DATA, CAPTCHA_DATA, REGION_DATA, IMAGE_DATA, COMPARE_DATA, WRITING_DATA, SWAG_DATA, TAG_DATA, OLD_CLASSIFICATION_DATA, STUDY_DATA, DET_DATA, SUPER_DATA, LETTERBOX_DATA, REGRESSION_DATA, SEGMENTATION_DATA, INSTANCE_DATA, ISEG_DATA
+    CLASSIFICATION_DATA,
+    DETECTION_DATA,
+    CAPTCHA_DATA,
+    REGION_DATA,
+    IMAGE_DATA,
+    COMPARE_DATA,
+    WRITING_DATA,
+    SWAG_DATA,
+    TAG_DATA,
+    OLD_CLASSIFICATION_DATA,
+    STUDY_DATA,
+    DET_DATA,
+    SUPER_DATA,
+    LETTERBOX_DATA,
+    REGRESSION_DATA,
+    SEGMENTATION_DATA,
+    INSTANCE_DATA,
+    ISEG_DATA
 } data_type;
 
 typedef struct load_args{
@@ -770,6 +797,7 @@ typedef struct load_args{
     int data_fusion_type;
     float data_fusion_prob;
     float mosaic_min_offset;
+    int is_todct;
     data *d;
     image *im;
     image *resized;
@@ -818,7 +846,6 @@ void forward_network(network *net);
 void backward_network(network *net);
 void update_network(network *net);
 
-
 float dot_cpu(int N, float *X, int INCX, float *Y, int INCY);
 void axpy_cpu(int N, float ALPHA, float *X, int INCX, float *Y, int INCY);
 void copy_cpu(int N, float *X, int INCX, float *Y, int INCY);
@@ -851,6 +878,8 @@ void mutual_forward_network_gpu(network *netp, network *netq);
 void mimicutual_forward_network_gpu(network *netp, network *netq, network *netr);
 void backward_network_gpu(network *net);
 void update_network_gpu(network *net);
+
+void scale_gamma(network* net, float alpha);
 
 float train_networks(network **nets, int n, data d, int interval);
 float mimic_train_networks(network **netps, network **netqs, int n, data d, int interval);

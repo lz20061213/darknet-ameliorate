@@ -534,6 +534,29 @@ void rgbgr_image(image im)
     }
 }
 
+void rgbgr_chwhc(float *input, uint8_t *output, int h, int w, int c) {
+    int i, j, k;
+    for (i=0; i<c; ++i) {
+        for (j=0; j<h; ++j) {
+            for (k=0; k<w; ++k) {
+                output[k*h*c+j*c+i] = (uint8_t)input[(c-1-i)*h*w+j*w+k];
+            }
+        }
+    }
+}
+
+void whchw(float *input, float *output, int h, int w, int c) {
+    int i, j, k;
+    for (i=0; i<c; ++i) {
+        for (j=0; j<h; ++j) {
+            for (k=0; k<w; ++k) {
+                output[i*h*w+j*w+k] = input[k*h*c+j*c+i];
+            }
+        }
+    }
+}
+
+
 int show_image(image p, const char *name, int ms)
 {
 #ifdef OPENCV

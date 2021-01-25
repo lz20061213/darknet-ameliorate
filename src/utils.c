@@ -185,7 +185,7 @@ char *basecfg(char *cfgfile)
         c = next+1;
     }
     c = copy_string(c);
-    next = strchr(c, '.');
+    next = strrchr(c, '.');
     if (next) *next = 0;
     return c;
 }
@@ -252,6 +252,7 @@ void replace_image_to_label(const char* input_path, char* output_path)
     find_replace(input_path, "/images/train2014/", "/labels/train2014/", output_path);    // COCO
     find_replace(output_path, "/images/val2014/", "/labels/val2014/", output_path);        // COCO
     find_replace(output_path, "/JPEGImages/", "/labels/", output_path);    // PascalVOC
+    find_replace(output_path, "/images/", "/labels/", output_path);
     // others
     find_replace(output_path, "/ImageSets/", "/Annotations/", output_path);; // Ship-Comp
     trim(output_path);
@@ -937,5 +938,12 @@ void quantize(float *x, int n, int total_bitwidth, int fraction_bitwidth)
         float element = x[i];
         element = round(element * shift) / shift;
         x[i] = constrain(-bound, bound, element);
+    }
+}
+
+void short2float(short* src, float* dst, int n) {
+    int i;
+    for (i = 0; i < n; ++i) {
+        dst[i] = (float)src[i];
     }
 }

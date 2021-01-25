@@ -1,0 +1,6 @@
+cd libjpeg-turbo-2.0.5
+rm -rf build && mkdir build
+cd build
+cmake -G"Unix Makefiles" -D CMAKE_INSTALL_PREFIX=../../install/ -D CMAKE_BUILD_TYPE=Release ..
+make -j
+make install

@@ -405,7 +405,6 @@ layer parse_yolo(list *options, size_params params, network *net)
     l.post_training_quantization = option_find_int_quiet(options, "post_training_quantization", net->post_training_quantization);
     l.quantization_aware_training = option_find_int_quiet(options, "quantization_aware_training", net->quantization_aware_training);
 
-
     char *iou_loss = option_find_str_quiet(options, "iou_loss", "mse");   //
     if (strcmp(iou_loss, "mse") == 0) l.iou_loss = MSE;
     else if (strcmp(iou_loss, "giou") == 0) l.iou_loss = GIOU;
@@ -476,6 +475,44 @@ layer parse_distill_yolo(list *options, size_params params) {
     l.margin = option_find_float_quiet(options, "margin", 0.1);
     l.alpha = option_find_float_quiet(options, "alpha", 0.7);
 
+    l.scale_xy = option_find_float_quiet(options, "scale_xy", 1);
+    l.use_center_regression = option_find_int(options, "use_center_regression", 0);
+    l.object_focal_loss = option_find_int(options, "object_focal_loss", 0);
+
+    l.iou_normalizer = option_find_float_quiet(options, "iou_normalizer", 1);
+    l.cls_normalizer = option_find_float_quiet(options, "cls_normalizer", 1);
+
+    l.label_smooth_rate = option_find_float_quiet(options, "label_smooth_rate", 0);
+
+    char *iou_loss = option_find_str_quiet(options, "iou_loss", "mse");   //
+    if (strcmp(iou_loss, "mse") == 0) l.iou_loss = MSE;
+    else if (strcmp(iou_loss, "giou") == 0) l.iou_loss = GIOU;
+    else if (strcmp(iou_loss, "diou") == 0) l.iou_loss = DIOU;
+    else if (strcmp(iou_loss, "ciou") == 0) l.iou_loss = CIOU;
+    else l.iou_loss = IOU;
+
+    char *iou_thresh_kind_str = option_find_str_quiet(options, "iou_thresh_kind", "iou");
+    if (strcmp(iou_thresh_kind_str, "iou") == 0) l.iou_thresh_kind = IOU;
+    else if (strcmp(iou_thresh_kind_str, "giou") == 0) l.iou_thresh_kind = GIOU;
+    else if (strcmp(iou_thresh_kind_str, "diou") == 0) l.iou_thresh_kind = DIOU;
+    else if (strcmp(iou_thresh_kind_str, "ciou") == 0) l.iou_thresh_kind = CIOU;
+    else {
+        fprintf(stderr, " Wrong iou_thresh_kind = %s \n", iou_thresh_kind_str);
+        l.iou_thresh_kind = IOU;
+    }
+
+    l.beta_nms = option_find_float_quiet(options, "beta_nms", 0.6);
+    char *nms_kind = option_find_str_quiet(options, "nms_kind", "default");
+    if (strcmp(nms_kind, "default") == 0) l.nms_kind = DEFAULT_NMS;
+    else {
+        if (strcmp(nms_kind, "greedynms") == 0) l.nms_kind = GREEDY_NMS;
+        else if (strcmp(nms_kind, "diounms") == 0) l.nms_kind = DIOU_NMS;
+        else l.nms_kind = DEFAULT_NMS;
+        printf("nms_kind: %s (%d), beta = %f \n", nms_kind, l.nms_kind, l.beta_nms);
+    }
+
+    l.atss =  option_find_int_quiet(options, "atss", 0);
+
     char *map_file = option_find_str(options, "map", 0);
     if (map_file) l.map = read_map(map_file);
 
@@ -519,6 +556,44 @@ layer parse_mutual_yolo(list *options, size_params params) {
     l.random = option_find_int_quiet(options, "random", 0);
     l.margin = option_find_float_quiet(options, "margin", 0.1);
     l.alpha = option_find_float_quiet(options, "alpha", 0.7);
+
+    l.scale_xy = option_find_float_quiet(options, "scale_xy", 1);
+    l.use_center_regression = option_find_int(options, "use_center_regression", 0);
+    l.object_focal_loss = option_find_int(options, "object_focal_loss", 0);
+
+    l.iou_normalizer = option_find_float_quiet(options, "iou_normalizer", 1);
+    l.cls_normalizer = option_find_float_quiet(options, "cls_normalizer", 1);
+
+    l.label_smooth_rate = option_find_float_quiet(options, "label_smooth_rate", 0);
+
+    char *iou_loss = option_find_str_quiet(options, "iou_loss", "mse");   //
+    if (strcmp(iou_loss, "mse") == 0) l.iou_loss = MSE;
+    else if (strcmp(iou_loss, "giou") == 0) l.iou_loss = GIOU;
+    else if (strcmp(iou_loss, "diou") == 0) l.iou_loss = DIOU;
+    else if (strcmp(iou_loss, "ciou") == 0) l.iou_loss = CIOU;
+    else l.iou_loss = IOU;
+
+    char *iou_thresh_kind_str = option_find_str_quiet(options, "iou_thresh_kind", "iou");
+    if (strcmp(iou_thresh_kind_str, "iou") == 0) l.iou_thresh_kind = IOU;
+    else if (strcmp(iou_thresh_kind_str, "giou") == 0) l.iou_thresh_kind = GIOU;
+    else if (strcmp(iou_thresh_kind_str, "diou") == 0) l.iou_thresh_kind = DIOU;
+    else if (strcmp(iou_thresh_kind_str, "ciou") == 0) l.iou_thresh_kind = CIOU;
+    else {
+        fprintf(stderr, " Wrong iou_thresh_kind = %s \n", iou_thresh_kind_str);
+        l.iou_thresh_kind = IOU;
+    }
+
+    l.beta_nms = option_find_float_quiet(options, "beta_nms", 0.6);
+    char *nms_kind = option_find_str_quiet(options, "nms_kind", "default");
+    if (strcmp(nms_kind, "default") == 0) l.nms_kind = DEFAULT_NMS;
+    else {
+        if (strcmp(nms_kind, "greedynms") == 0) l.nms_kind = GREEDY_NMS;
+        else if (strcmp(nms_kind, "diounms") == 0) l.nms_kind = DIOU_NMS;
+        else l.nms_kind = DEFAULT_NMS;
+        printf("nms_kind: %s (%d), beta = %f \n", nms_kind, l.nms_kind, l.beta_nms);
+    }
+
+    l.atss =  option_find_int_quiet(options, "atss", 0);
 
     char *map_file = option_find_str(options, "map", 0);
     if (map_file) l.map = read_map(map_file);
@@ -923,6 +998,7 @@ layer parse_upsample(list *options, size_params params, network *net)
     l.scale = option_find_float_quiet(options, "scale", 1);
 
     l.post_training_quantization = option_find_int_quiet(options, "post_training_quantization", net->post_training_quantization);
+    l.quantize_per_channel = option_find_int_quiet(options, "quantize_per_channel", net->quantize_per_channel);
     if (l.post_training_quantization) {
         l.x_fl = calloc(1, sizeof(int));
         *(l.x_fl) = 0;
@@ -970,6 +1046,7 @@ route_layer parse_route(list *options, size_params params, network *net)
     }
 
     layer.post_training_quantization = option_find_int_quiet(options, "post_training_quantization", net->post_training_quantization);
+    layer.quantize_per_channel = option_find_int_quiet(options, "quantize_per_channel", net->quantize_per_channel);
     if (layer.post_training_quantization) {
         layer.x_fl = calloc(1, sizeof(int));
         *(layer.x_fl) = 0;
@@ -1127,6 +1204,11 @@ void parse_net_options(list *options, network *net)
     net->slimming_scale = option_find_float_quiet(options, "slimming_scale", 0.0001);
     net->slimming_alpha = option_find_float_quiet(options, "slimming_alpha", 0.1);
 
+    net->poly_slimming = option_find_int_quiet(options, "poly_slimming", 1);
+    net->slimming_min_scale = option_find_float_quiet(options, "slimming_min_scale", 0.1);
+    net->slimming_max_scale = option_find_float_quiet(options, "slimming_max_scale", 1.0);;
+    net->slimming_start_batch = option_find_int_quiet(options, "slimming_start_batch", 0);
+
     net->filter_thresh = option_find_float_quiet(options, "filter_thresh", 0);
 
      // 0: original, 1: mixup, 2: cutmix, 3: mosaic, 4: mosaic + cutmix, ...
@@ -1214,6 +1296,8 @@ void parse_net_options(list *options, network *net)
     net->quantization_aware_training = option_find_int_quiet(options, "quantization_aware_training", 0);
     assert(net->quantize == net->post_training_quantization + net->quantization_aware_training);
     net->transfer_input = option_find_int_quiet(options, "transfer_input", 0);
+    net->transfer_todct = option_find_int_quiet(options, "transfer_todct", 0);
+    net->dct_onlyY = option_find_int_quiet(options, "dct_onlyY", 1);
 
     net->convx_bias_align = option_find_int_quiet(options, "convx_bias_align", 0);
     net->write_statistic_fl = option_find_int_quiet(options, "write_statistic_fl", 0);
@@ -1265,6 +1349,11 @@ network *parse_network_cfg(char *filename)
     params.batch = net->batch;
     params.time_steps = net->time_steps;
     params.net = net;
+    if (net->transfer_todct) {
+        params.h = net->h / 8;
+        params.w = net->w / 8;
+        params.c = 32;
+    }
 
     size_t workspace_size = 0;
     n = n->next;
@@ -1316,7 +1405,7 @@ network *parse_network_cfg(char *filename)
             l = parse_mutual_yolo(options, params);
         }else if(lt == MIMICUTUAL_YOLO) {
             l = parse_mimicutual_yolo(options, params);
-        }else  if(lt == DOUBLE_YOLO) {
+        }else if(lt == DOUBLE_YOLO) {
             l = parse_double_yolo(options, params);
         }else if(lt == ISEG){
             l = parse_iseg(options, params);
@@ -1364,6 +1453,8 @@ network *parse_network_cfg(char *filename)
         l.stopbackward = option_find_int_quiet(options, "stopbackward", 0);
         l.dontsave = option_find_int_quiet(options, "dontsave", 0);
         l.dontload = option_find_int_quiet(options, "dontload", 0);
+        l.skipload = option_find_int_quiet(options, "skipload", 0);
+        l.skipfilters = option_find_int_quiet(options, "skipfilters", 0);
         l.numload = option_find_int_quiet(options, "numload", 0);
         l.dontloadscales = option_find_int_quiet(options, "dontloadscales", 0);
         l.learning_rate_scale = option_find_float_quiet(options, "learning_rate", 1);
@@ -1387,11 +1478,15 @@ network *parse_network_cfg(char *filename)
     net->truths = out.outputs;
     if(net->layers[net->n-1].truths) net->truths = net->layers[net->n-1].truths;
     net->output = out.output;
-    net->input = calloc(net->inputs*net->batch, sizeof(float));
+    int size = net->inputs;
+    if (net->transfer_todct) {
+        size = net->layers[0].inputs;
+    }
+    net->input = calloc(size*net->batch, sizeof(float));
     net->truth = calloc(net->truths*net->batch, sizeof(float));
 #ifdef GPU
     net->output_gpu = out.output_gpu;
-    net->input_gpu = cuda_make_array(net->input, net->inputs*net->batch);
+    net->input_gpu = cuda_make_array(net->input, size*net->batch);
     net->truth_gpu = cuda_make_array(net->truth, net->truths*net->batch);
 #endif
     if(workspace_size){
@@ -1691,7 +1786,11 @@ void load_convolutional_weights(layer l, FILE *fp)
     }
     if(l.numload) l.n = l.numload;
     int num = l.c/l.groups*l.n*l.size*l.size;
-    fread(l.biases, sizeof(float), l.n, fp);
+    if (l.skipload) {
+        fseek(fp, sizeof(float)*l.skipfilters, 1);
+    } else {
+        fread(l.biases, sizeof(float), l.n, fp);
+    }
 
     if(l.post_training_quantization) {
         if (l.quantize_per_channel) {
@@ -1704,11 +1803,16 @@ void load_convolutional_weights(layer l, FILE *fp)
 
     if (l.batch_normalize && (!l.dontloadscales)){
         //printf("load batchnorm\n");
-        fread(l.scales, sizeof(float), l.n, fp);
+        if (l.skipload) {
+            fseek(fp, sizeof(float)*l.skipfilters*3, 1);
+        }
+        else {
+            fread(l.scales, sizeof(float), l.n, fp);
+            fread(l.rolling_mean, sizeof(float), l.n, fp);
+            fread(l.rolling_variance, sizeof(float), l.n, fp);
+        }
         //printf("l.scales: %f %f %f\n", l.scales[0], l.scales[1], l.scales[2]);
-        fread(l.rolling_mean, sizeof(float), l.n, fp);
         //printf("l.rolling_mean: %f %f %f\n", l.rolling_mean[0], l.rolling_mean[1], l.rolling_mean[2]);
-        fread(l.rolling_variance, sizeof(float), l.n, fp);
         //printf("l.rolling_variance: %f %f %f\n", l.rolling_variance[0], l.rolling_variance[1], l.rolling_variance[2]);
         if(0){
             int i;
@@ -1738,7 +1842,13 @@ void load_convolutional_weights(layer l, FILE *fp)
         }
     }
 
-    fread(l.weights, sizeof(float), num, fp);
+    if (l.skipload) {
+        int skipnum = l.c/l.groups*l.skipfilters*l.size*l.size;
+        fseek(fp, sizeof(float)*skipnum, 1);
+    }
+    else {
+        fread(l.weights, sizeof(float), num, fp);
+    }
 
     if(l.post_training_quantization) {
         if (l.quantize_per_channel) {
@@ -1932,14 +2042,11 @@ int get_appr_range(float *X, int n, int bitwidth, float keep_rate) {
     return (bitwidth - 1 - appr_shift);
 }
 
-void calculate_appr_fracs(network **nets, int n)
-{
-    // we use network 0 for calculation
-    network *rep = nets[0];
+void calculate_appr_fracs_network(network *net) {
     int i, j, k;
     int net_fl = 0;
-    for(i = 0; i < rep->n; ++i) {
-        layer *l = &rep->layers[i];
+    for(i = 0; i < net->n; ++i) {
+        layer *l = &net->layers[i];
         if (l->type == CONVOLUTIONAL) {
             //printf("convolutional %d\n", i);
             const size_t filter_size = l->size*l->size*l->c / l->groups;
@@ -1981,21 +2088,36 @@ void calculate_appr_fracs(network **nets, int n)
             //printf("net_fl: %d\n", net_fl);
         } else if (l->type == ROUTE) {
             int index = l->input_layers[0];
-            if (rep->layers[index].type == UPSAMPLE)
+            if (net->layers[index].type == UPSAMPLE)
                 index -= 1;
-            net_fl = rep->layers[index].quantize_feature_fraction_bitwidth;
+            net_fl = net->layers[index].quantize_feature_fraction_bitwidth;
         }
     }
+}
+
+void copy_appr_fracs_network(network *src, network *dst) {
+    int j, k;
+    // copy the quantize_weight_fraction_bitwidths/quantize_bias_fraction_bitwidths from src_net to dst_net
+    for (j = 0; j < src->n; ++j) {
+        if (src->layers[j].type == CONVOLUTIONAL) {
+            for (k = 0; k < src->layers[j].n; ++k) {
+                dst->layers[j].quantize_weight_fraction_bitwidths[k] = src->layers[j].quantize_weight_fraction_bitwidths[k];
+                dst->layers[j].quantize_bias_fraction_bitwidths[k] = src->layers[j].quantize_bias_fraction_bitwidths[k];
+            }
+        }
+    }
+}
+
+void calculate_appr_fracs_networks(network **nets, int n)
+{
+    int i;
+
+    // we use network 0 for calculation
+    network *rep = nets[0];
+    calculate_appr_fracs_network(rep);
 
     // copy the quantize_weight_fraction_bitwidths/quantize_bias_fraction_bitwidths to all networks
     for (i = 1; i < n; ++i) {
-        for (j = 0; j < rep->n; ++j) {
-            if (rep->layers[j].type == CONVOLUTIONAL) {
-                for (k = 0; k < rep->layers[j].n; ++k) {
-                    nets[i]->layers[j].quantize_weight_fraction_bitwidths[k] = rep->layers[j].quantize_weight_fraction_bitwidths[k];
-                    nets[i]->layers[j].quantize_bias_fraction_bitwidths[k] = rep->layers[j].quantize_bias_fraction_bitwidths[k];
-                }
-            }
-        }
+        copy_appr_fracs_network(rep, nets[i]);
     }
 }

@@ -720,17 +720,22 @@ void forward_convolutional_layer_gpu(convolutional_layer l, network net)
         }
     }
 
-    if (net.write_results) {
-        if(l.activation == LINEAR) cuda_pull_array(l.output_gpu, l.output, l.batch*l.outputs);
+    if (net.write_results || net.write_statistic_features) {
+        cuda_pull_array(l.output_gpu, l.output, l.batch*l.outputs);
         char buff[100];
-        sprintf(buff, "ship/statistics/outputs/convolution_%02d.dat", l.current_layer_index);
+        if (net.write_results) {
+            sprintf(buff, "ship/statistics/outputs/convolution_%02d.dat", l.current_layer_index);
+        } else {
+            //printf("net.fild_id: %d\n", net.file_id);
+            sprintf(buff, "ship/statistics/outputs/convolution_%02d_%04d.dat", l.current_layer_index, net.file_id);
+        }
         FILE *fp;
         fp = fopen(buff, "wb");
         fwrite(l.output, sizeof(float), l.batch*l.outputs, fp);
         fclose(fp);
     }
 
-    if (net.write_statistic_features) {
+    if (0 && net.write_statistic_features) {
         // quantize: statistic the feature maps, for statistic lower feature_fraction_bitwidth
         cuda_pull_array(l.output_gpu, l.output, l.outputs*l.batch);
         qsort(l.output, l.batch*l.outputs, sizeof(float), float_compare);

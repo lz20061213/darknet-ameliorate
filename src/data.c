@@ -294,11 +294,10 @@ box_label *correct_boxes_with_thresh(box_label *boxes, int *n, float dx, float d
     *n = count;
 
     // free boxes
+    free(out_of_thresh);
     free(boxes);
 
-
     return filter_boxes;
-
 }
 
 void fill_truth_swag(char *path, float *truth, int classes, int flip, float dx, float dy, float sx, float sy)
