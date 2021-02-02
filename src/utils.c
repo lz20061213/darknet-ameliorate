@@ -947,3 +947,37 @@ void short2float(short* src, float* dst, int n) {
         dst[i] = (float)src[i];
     }
 }
+
+int folder_mkdirs(char *folder_path)
+{
+	if(!access(folder_path, F_OK)){                        /* 判断目标文件夹是否存在 */
+		return 1;
+	}
+
+	char path[256];                                        /* 目标文件夹路径 */
+	char *path_buf;                                        /* 目标文件夹路径指针 */
+	char temp_path[256];                                   /* 存放临时文件夹路径 */
+	char *temp;                                            /* 单级文件夹名称 */
+	int temp_len;                                          /* 单级文件夹名称长度 */
+
+	memset(path, 0, sizeof(path));
+	memset(temp_path, 0, sizeof(temp_path));
+	strcat(path, folder_path);
+	path_buf = path;
+
+	while((temp = strsep(&path_buf, "/")) != NULL){        /* 拆分路径 */
+		temp_len = strlen(temp);
+		if(0 == temp_len){
+			continue;
+		}
+		strcat(temp_path, "/");
+		strcat(temp_path, temp);
+		//printf("temp_path = %s\n", temp_path);
+		if(-1 == access(temp_path, F_OK)){                 /* 不存在则创建 */
+			if(-1 == mkdir(temp_path, 0777)){
+				return 2;
+			}
+		}
+	}
+	return 1;
+}

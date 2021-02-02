@@ -3,10 +3,39 @@
 #include "utils.h"
 #include "parser.h"
 #include <assert.h>
+#include <libgen.h>
 
 static int coco_ids[] = {1,2,3,4,5,6,7,8,9,10,11,13,14,15,16,17,18,19,20,21,22,23,24,25,27,28,31,32,33,34,35,36,37,38,39,40,41,42,43,44,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,67,70,72,73,74,75,76,77,78,79,80,81,82,84,85,86,87,88,89,90};
 
 #define SAVE_EVERY 1000
+
+int index_of_array(char **names, char *name, int num) {
+    int i;
+    for (i = 0; i < num; ++i) {
+        if (strcmp(names[i], name) == 0)
+            return i;
+    }
+    return -1;
+}
+
+void get_keypoints_flip_map(load_args *args, char** keypoint_names, char **keypoint_maps)
+{
+    int i, j;
+    args->keypoints_flip_map = calloc(args->keypoint_id_map_count, sizeof(keypoint_id_map));
+    printf("flip mapping:\n");
+    for (i = 0; i < args->keypoint_id_map_count; ++i) {
+        char *map_string = keypoint_maps[i];
+        list *s = split_str(map_string, ':');
+        assert(s->size == 2);
+        char **lrs = (char **)list_to_array(s);
+        int l = index_of_array(keypoint_names, lrs[0], args->keypoints_num);
+        int r = index_of_array(keypoint_names, lrs[1], args->keypoints_num);
+        args->keypoints_flip_map[i].lid = l;
+        args->keypoints_flip_map[i].rid = r;
+        printf("%s(%d) -> %s(%d)\n", lrs[0], l, lrs[1], r);
+        // CHECK: for free
+    }
+}
 
 void train_keypoint_detector(char *datacfg, char *cfgfile, char *weightfile, char *backup_directory, int *gpus, int ngpus, int clear)
 {
@@ -89,6 +118,20 @@ void train_keypoint_detector(char *datacfg, char *cfgfile, char *weightfile, cha
     //args.type = INSTANCE_DATA;
     args.threads = 64;
 
+    // get keypoints_flip_map
+    char *name_path = option_find_str(options, "names", "data/names.list");
+    list *name_list = get_paths(name_path);
+    char **names = (char **)list_to_array(name_list);
+
+    char *keypoint_map_path = option_find_str(options, "keypoint_flip_maps", "data/flip.list");
+    list *keypoint_map_list = get_paths(keypoint_map_path);
+    int map_count = keypoint_map_list -> size;
+    char **keypoint_maps = (char **)list_to_array(keypoint_map_list);
+
+    args.keypoint_id_map_count = map_count;
+    if (map_count > 0)
+        get_keypoints_flip_map(&args, names+1, keypoint_maps);
+
     int init_w = net->w;
     int init_h = net->h;
 
@@ -159,8 +202,9 @@ void train_keypoint_detector(char *datacfg, char *cfgfile, char *weightfile, cha
            save_image(im, "truth11");
            }
          */
-
-        printf("Loaded: %lf seconds\n", what_time_is_it_now()-time);
+        float load_time = what_time_is_it_now()-time;
+        if (load_time > 0.001)
+            printf("Loaded: %lf seconds\n", load_time);
 
         time=what_time_is_it_now();
         float loss = 0;
@@ -288,7 +332,8 @@ int value_comparator(const void *kpa, const void *kpb)
 {
     keypoint a = *(keypoint *)kpa;
     keypoint b = *(keypoint *)kpb;
-    float diff = a.v - b.v;
+    // CHECK: sigmoid (-1, 0, 1 will be update for classification)
+    float diff = abs(a.v) - abs(b.v);
     if(diff < 0) return 1;
     else if(diff > 0) return -1;
     return 0;
@@ -328,13 +373,17 @@ void keypoints_decode(detection_with_keypoints *dets, int num, network *net, flo
 {
     // get the output of heatmaps and heatmaps_offset
     int i, j, k, topk = 100;
+    int flag = 0;
     layer l = {0};
     for(i=net->n-1; i>=0; --i) {
         l = net->layers[i];
         if (l.type == HEATMAP) {
+            flag = 1;
             break;
         }
     }
+    if (!flag) return;
+
     // nms for heatmap
     heatmap_nms(l);
     // get the top k of heatmap
@@ -390,7 +439,7 @@ void test_keypoint_detector(char *datacfg, char *cfgfile, char *weightfile, char
     if (net->quantize) {
         if (net->quantization_aware_training) {
             if (net->quantize_per_channel) {
-                int i, j;
+                //int i, j;
                 char *float_weightfile = option_find_str(options, "float_weightfile", "backup/final.weights");
                 network *float_net = load_network(cfgfile, float_weightfile, 0);
                 calculate_appr_fracs_network(float_net);
@@ -492,6 +541,134 @@ void test_keypoint_detector(char *datacfg, char *cfgfile, char *weightfile, char
     }
 }
 
+void test_list_keypoint_detector(char *datacfg, char *cfgfile, char *weightfile, char *filename, float thresh, float hier_thresh, char *outfile, int fullscreen)
+{
+    list *options = read_data_cfg(datacfg);
+    char *name_list = option_find_str(options, "names", "data/names.list");
+    char **names = get_labels(name_list);
+
+    char *test_list = option_find_str(options, "test_list", "data/test.list");
+    char *out_folder = option_find_str(options, "out_folder", "predicts");
+
+    int show_result = option_find_int(options, "show_result", 0);
+
+    image **alphabet = load_alphabet();
+
+    network *net = load_network(cfgfile, weightfile, 0);
+
+    if (net->quantize) {
+        if (net->quantization_aware_training) {
+            if (net->quantize_per_channel) {
+                int i, j;
+                char *float_weightfile = option_find_str(options, "float_weightfile", "backup/final.weights");
+                network *float_net = load_network(cfgfile, float_weightfile, 0);
+                calculate_appr_fracs_network(float_net);
+                copy_appr_fracs_network(float_net, net);
+                free_network(float_net);
+                printf("finish weight and bias fraction bitwidths calculation and copying\n");
+                /*
+                for(i = 0; i < net->n; ++i) {
+                    layer *l = &net->layers[i];
+                    if (l->type == CONVOLUTIONAL) {
+                        printf("convolutional %d\n", i);
+                        for (j = 0; j < l->n; ++j) {
+                            printf("channel %d: %d %d\n", j, l->quantize_weight_fraction_bitwidths[j], l->quantize_bias_fraction_bitwidths[j]);
+                        }
+                    }
+                }
+                */
+            }
+        }
+    }
+
+    int i, j, m;
+    set_batch_network(net, 1);
+    srand(2222222);
+    double time;
+    char buff[256];
+    char *input = buff;
+    float nms=0.45;
+
+    layer l = {0};
+    for(i=net->n-1; i>=0; --i) {
+        l = net->layers[i];
+        if (l.type == KEYPOINT_YOLO) break;
+    }
+
+    list *plist = get_paths(test_list);
+    char **paths = (char **) list_to_array(plist);
+    int num = plist->size;
+
+    for (m = 0; m < num; ++m) {
+        char *path = paths[m];
+        //printf("test image path: %s\n", path);
+        image im = load_image_color(path, 0, 0);
+        image sized = letterbox_image(im, net->w, net->h);
+        //image sized = resize_image(im, net->w, net->h);
+        //image sized2 = resize_max(im, net->w);
+        //image sized = crop_image(sized2, -((net->w - sized2.w)/2), -((net->h - sized2.h)/2), net->w, net->h);
+        //resize_network(net, sized.w, sized.h);
+        printf("classes: %d\n", l.classes);
+
+        float *X = sized.data;
+        time=what_time_is_it_now();
+        network_predict(net, X);
+        printf("%s: Predicted in %f seconds.\n", path, what_time_is_it_now()-time);
+        int nboxes_with_keypoints = 0;
+        // 1. get the results of top-down branch
+        detection_with_keypoints *dets = get_network_boxes_with_keypoints(net, im.w, im.h, thresh, hier_thresh, 0, 1, &nboxes_with_keypoints);
+        /*
+        for (i = 0; i < nboxes_with_keypoints; ++i) {
+            detection_with_keypoints det = dets[i];
+            for(j = 0; j < l.classes; ++j){
+                printf("prob: %f\n", det.prob[j]);
+            }
+            printf("x, y, w, h: %f %f %f %f\n", det.bkps.x, det.bkps.y, det.bkps.w, det.bkps.h);
+            for (j = 0; j < det.bkps.keypoints_num; ++j) {
+                printf("vis, x, y: %f %f %f\n", det.bkps.kps[j].v, det.bkps.kps[j].x, det.bkps.kps[j].y);
+            }
+        }
+        */
+        // do nms by box
+        if (nms) {
+            if (l.nms_kind == DEFAULT_NMS) {
+                do_nms_sort_with_keypoints(dets, nboxes_with_keypoints, l.classes, nms);
+            } else {
+                diounms_sort_with_keypoints(dets, nboxes_with_keypoints, l.classes, nms, l.nms_kind, l.beta_nms);
+            }
+        }
+        // 2. decode bottom-up keypoints and merge
+        keypoints_decode(dets, nboxes_with_keypoints, net, 0.25);  // todo: hp-thres
+        // 3. correct net to im coord
+        correct_keypoint_yolo_boxes_with_keypoints(dets, nboxes_with_keypoints, im.w, im.h, net->w, net->h, 1);
+        draw_detections_with_keypoints(im, dets, nboxes_with_keypoints, thresh, names, alphabet, l.classes);
+        free_detections_with_keypoints(dets, nboxes_with_keypoints);
+
+        if(out_folder){
+            char outpath[256];
+            find_replace(path, "images", out_folder, outpath);
+            // create folder
+            char *outfolder = dirname(outpath);
+            if (access(outfolder, 0)==-1) {
+                // mk folder revision
+                int stat = folder_mkdirs(outfolder);
+            }
+            //find_replace(outpath, ".jpg/../", "", outpath);
+            //save_image(im, outfile);
+        }
+
+        if (show_result) {
+#ifdef OPENCV
+            make_window("predictions", 512, 512, 0);
+            show_image(im, "predictions", 0);
+#endif
+        }
+
+        free_image(im);
+        free_image(sized);
+    }
+}
+
 void run_keypoint_detector(int argc, char **argv)
 {
     char *prefix = find_char_arg(argc, argv, "-prefix", 0);
@@ -546,6 +723,7 @@ void run_keypoint_detector(int argc, char **argv)
     int letter_box = find_int_arg(argc, argv, "-letter_box", 1);
 
     if(0==strcmp(argv[2], "test")) test_keypoint_detector(datacfg, cfg, weights, filename, thresh, hier_thresh, outfile, fullscreen);
+    else if(0==strcmp(argv[2], "test_list")) test_list_keypoint_detector(datacfg, cfg, weights, filename, thresh, hier_thresh, outfile, fullscreen);
     else if(0==strcmp(argv[2], "train")) train_keypoint_detector(datacfg, cfg, weights, backup_directory, gpus, ngpus, clear);
 
 }

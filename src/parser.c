@@ -825,6 +825,7 @@ layer parse_heatmap(list *options, size_params params)
     l.truths = l.max_boxes * (4 + keypoints_num * 3 + 1);
     l.alpha = option_find_float_quiet(options, "alpha", 2);
     l.beta = option_find_float_quiet(options, "beta", 4);
+    l.scale = option_find_float_quiet(options, "scale", 1.);
     return l;
 }
 
@@ -1366,6 +1367,8 @@ void parse_net_options(list *options, network *net)
     char *p = option_find_str(options, "distill_layers", "-1,-1,-1");
     char *q = option_find_str(options, "mutual_layers", "-1,-1,-1");
     //if (!l || !p) error("mimic_train must have hint_layers and distill_layers in cfg file.");
+
+    net->log_step = option_find_int(options, "log_step", 1);
 
     int len = strlen(l);
     int n = 1;

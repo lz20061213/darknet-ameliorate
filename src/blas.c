@@ -170,6 +170,19 @@ void clamp_cpu(int N, float *X, int INCX, float clamp_min, float clamp_max)
     for(i = 0; i < N; ++i) X[i*INCX] = fmin(clamp_max, fmax(clamp_min, X[i*INCX]));
 }
 
+void fabsf_clamp_cpu(int N, float *X, int INCX, float clamp_min, float clamp_max)
+{
+    int i;
+    for(i = 0; i < N; ++i) {
+        if (X[i*INCX] >= 0) {
+            X[i*INCX] = fmin(clamp_max, fmax(clamp_min, X[i*INCX]));
+        }
+        else {
+            X[i*INCX] = fmin(-clamp_min, fmax(-clamp_max, X[i*INCX]));
+        }
+    }
+}
+
 void mul_cpu(int N, float *X, int INCX, float *Y, int INCY)
 {
     int i;

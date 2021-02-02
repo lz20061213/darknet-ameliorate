@@ -209,6 +209,7 @@ keypoint_label *read_boxes_with_keypoints(char *filename, int *n, int keypoints_
         keypoints[count].kps = calloc(keypoints_num, sizeof(keypoint));
         //printf("keypoints_num: %d\n", keypoints_num);
         for (i=0; i < keypoints_num; ++i) {
+            // here we defin visible: -1(existent, occlusion), 0(inexistent), 1(existent, visible), for symmetry
             if (fscanf(file, "%f %f %f", &vis, &kpx, &kpy) == 3) {
                 //printf("vis, kpx, kpy: %.2f, %.2f, %.2f\n", vis, kpx, kpy);
                 keypoints[count].kps[i].v = vis;
@@ -283,7 +284,8 @@ void correct_boxes(box_label *boxes, int n, float dx, float dy, float sx, float 
     }
 }
 
-void correct_keypoints(keypoint_label *keypoints, int n, float dx, float dy, float sx, float sy, int flip) {
+void correct_boxes_with_keypoints(keypoint_label *keypoints, int n, float dx, float dy, float sx, float sy, int flip,
+                                    keypoint_id_map *keypoints_flip_map, int keypoint_id_map_count) {
     int i, j;
     for(i = 0; i < n; ++i){
         if(keypoints[i].x == 0 && keypoints[i].y == 0) {
@@ -300,7 +302,7 @@ void correct_keypoints(keypoint_label *keypoints, int n, float dx, float dy, flo
         keypoints[i].bottom = keypoints[i].bottom* sy - dy;
 
         for(j = 0; j < keypoints[i].keypoints_num; ++j) {
-            if ((int)(keypoints[i].kps[j].v)) {
+            if (fabsf(keypoints[i].kps[j].v) > 0) {
                 keypoints[i].kps[j].x = keypoints[i].kps[j].x * sx - dx;
                 keypoints[i].kps[j].y = keypoints[i].kps[j].y * sy - dy;
             }
@@ -310,9 +312,24 @@ void correct_keypoints(keypoint_label *keypoints, int n, float dx, float dy, flo
             float swap = keypoints[i].left;
             keypoints[i].left = 1. - keypoints[i].right;
             keypoints[i].right = 1. - swap;
+
+            // flip mapping
+            for (j = 0; j < keypoint_id_map_count; ++j) {
+                int lid = keypoints_flip_map[j].lid;
+                int rid = keypoints_flip_map[j].rid;
+                keypoint swap = keypoints[i].kps[lid];
+                keypoints[i].kps[lid] = keypoints[i].kps[rid];
+                keypoints[i].kps[rid] = swap;
+            }
+            // for flip 1.-x
             for (j = 0; j < keypoints[i].keypoints_num; ++j) {
-                if ((int)(keypoints[i].kps[j].v))
+                if (fabsf(keypoints[i].kps[j].v) > 0) {
                     keypoints[i].kps[j].x = 1 - keypoints[i].kps[j].x;
+                }
+                else {
+                    keypoints[i].kps[j].x = -1.;
+                    keypoints[i].kps[j].y = -1.;
+                }
             }
         }
 
@@ -331,12 +348,12 @@ void correct_keypoints(keypoint_label *keypoints, int n, float dx, float dy, flo
 
         // constrain kps
         for (j = 0; j <  keypoints[i].keypoints_num; ++j) {
-            if ((int)(keypoints[i].kps[j].v)) {
+            if (fabsf(keypoints[i].kps[j].v) > 0) {
                 if (keypoints[i].kps[j].x < 0 || keypoints[i].kps[j].x > 1 || keypoints[i].kps[j].y < 0
                     || keypoints[i].kps[j].y > 1) {
                     keypoints[i].kps[j].v = 0;
-                    keypoints[i].kps[j].x = 0;
-                    keypoints[i].kps[j].y = 0;
+                    keypoints[i].kps[j].x = -1.;
+                    keypoints[i].kps[j].y = -1.;
                 }
             }
         }
@@ -418,7 +435,8 @@ box_label *correct_boxes_with_thresh(box_label *boxes, int *n, float dx, float d
     return filter_boxes;
 }
 
-keypoint_label *correct_keypoints_with_thresh(keypoint_label *keypoints, int *n, float dx, float dy, float sx, float sy, int flip, float thresh) {
+keypoint_label *correct_boxes_with_keypoints_with_thresh(keypoint_label *keypoints, int *n, float dx, float dy, float sx,
+                    float sy, int flip, float thresh, keypoint_id_map *keypoints_flip_map, int keypoint_id_map_count) {
     int i, j, k;
     int* out_of_thresh = calloc(*n, sizeof(int));
     int count = *n;
@@ -437,7 +455,7 @@ keypoint_label *correct_keypoints_with_thresh(keypoint_label *keypoints, int *n,
         keypoints[i].bottom = keypoints[i].bottom* sy - dy;
 
         for(j = 0; j < keypoints[i].keypoints_num; ++j) {
-            if (keypoints[i].kps[j].v) {
+            if (fabsf(keypoints[i].kps[j].v) > 0) {
                 keypoints[i].kps[j].x = keypoints[i].kps[j].x * sx - dx;
                 keypoints[i].kps[j].y = keypoints[i].kps[j].y * sy - dy;
             }
@@ -449,9 +467,23 @@ keypoint_label *correct_keypoints_with_thresh(keypoint_label *keypoints, int *n,
             float swap = keypoints[i].left;
             keypoints[i].left = 1. - keypoints[i].right;
             keypoints[i].right = 1. - swap;
+            // flip mapping
+            for (j = 0; j < keypoint_id_map_count; ++j) {
+                int lid = keypoints_flip_map[j].lid;
+                int rid = keypoints_flip_map[j].rid;
+                keypoint swap = keypoints[i].kps[lid];
+                keypoints[i].kps[lid] = keypoints[i].kps[rid];
+                keypoints[i].kps[rid] = swap;
+            }
+            // for flip 1.-x
             for (j = 0; j < keypoints[i].keypoints_num; ++j) {
-                if (keypoints[i].kps[j].v)
+                if (fabsf(keypoints[i].kps[j].v) > 0) {
                     keypoints[i].kps[j].x = 1 - keypoints[i].kps[j].x;
+                }
+                else {
+                    keypoints[i].kps[j].x = -1.;
+                    keypoints[i].kps[j].y = -1.;
+                }
             }
         }
 
@@ -470,12 +502,12 @@ keypoint_label *correct_keypoints_with_thresh(keypoint_label *keypoints, int *n,
 
         // constrain kps
         for (j = 0; j <  keypoints[i].keypoints_num; ++j) {
-            if (keypoints[i].kps[j].v) {
+            if (fabsf(keypoints[i].kps[j].v) > 0) {
                 if (keypoints[i].kps[j].x < 0 || keypoints[i].kps[j].x > 1 || keypoints[i].kps[j].y < 0
                     || keypoints[i].kps[j].y > 1) {
-                    keypoints[i].kps[j].v = 0;
-                    keypoints[i].kps[j].x = 0;
-                    keypoints[i].kps[j].y = 0;
+                    keypoints[i].kps[j].v = 0.;
+                    keypoints[i].kps[j].x = -1.;
+                    keypoints[i].kps[j].y = -1.;
                 }
             }
         }
@@ -809,7 +841,7 @@ void fill_truth_detection(char *path, int num_boxes, float *truth, int classes, 
 //    }
 }
 
-void fill_truth_keypoint_detection(char *path, int num_boxes, int keypoints_num, float *truth, int classes, int flip, float dx, float dy, float sx, float sy, float filter_thresh)
+void fill_truth_keypoint_detection(char *path, int num_boxes, int keypoints_num, keypoint_id_map *keypoints_flip_map, int keypoint_id_map_count, float *truth, int classes, int flip, float dx, float dy, float sx, float sy, float filter_thresh)
 {
     char labelpath[4096];
     find_replace(path, "images", "labels", labelpath);
@@ -825,9 +857,9 @@ void fill_truth_keypoint_detection(char *path, int num_boxes, int keypoints_num,
     keypoint_label *keypoints = read_boxes_with_keypoints(labelpath, &count, keypoints_num);
     randomize_keypoints(keypoints, count);
     if (filter_thresh > 0.01) {
-        keypoints = correct_keypoints_with_thresh(keypoints, &count, dx, dy, sx, sy, flip, filter_thresh);
+        keypoints = correct_boxes_with_keypoints_with_thresh(keypoints, &count, dx, dy, sx, sy, flip, filter_thresh, keypoints_flip_map, keypoint_id_map_count);
     } else {
-        correct_keypoints(keypoints, count, dx, dy, sx, sy, flip);
+        correct_boxes_with_keypoints(keypoints, count, dx, dy, sx, sy, flip, keypoints_flip_map, keypoint_id_map_count);
     }
     if(count > num_boxes) count = num_boxes;
     float x,y,w,h;
@@ -1540,7 +1572,6 @@ data load_data_detection(int n, char **paths, int m, int w, int h, int boxes, in
 
     d.y = make_matrix(n, 5*boxes);
     for(i = 0; i < n; ++i){
-
         switch (data_fusion_type) {
             case 0:
             {
@@ -1726,7 +1757,7 @@ data load_data_detection(int n, char **paths, int m, int w, int h, int boxes, in
 
 
 // original-data-augmentation
-data single_keypoint_data_transform(char* path, int w, int h, int boxes, int keypoints_num, int classes, float jitter, float hue, float saturation, float exposure, int openscale,
+data single_keypoint_data_transform(char* path, int w, int h, int boxes, int keypoints_num, keypoint_id_map* keypoints_flip_map, int keypoint_id_map_count, int classes, float jitter, float hue, float saturation, float exposure, int openscale,
     float filter_thresh, float min_scale, float max_scale)
 {
     data d = {0};
@@ -1787,23 +1818,39 @@ data single_keypoint_data_transform(char* path, int w, int h, int boxes, int key
 
     //show_image(sized, "sized", 0);
 
-    fill_truth_keypoint_detection(path, boxes, keypoints_num, d.y.vals[0], classes, flip, -dx/w, -dy/h, nw/w, nh/h, filter_thresh);
+    fill_truth_keypoint_detection(path, boxes, keypoints_num, keypoints_flip_map, keypoint_id_map_count, d.y.vals[0], classes, flip, -dx/w, -dy/h, nw/w, nh/h, filter_thresh);
 
     // for test
     /*
+    printf("image path: %s\n", path);
     IplImage* train_img = image_to_ipl(sized);
     float *truth = d.y.vals[0];
-    int i, n;
+    int i, n, k;
     n = 4 + 3 * keypoints_num + 1;
+    char temp[10];
+    sprintf(temp, "flip:%d", flip);
+    CvFont font;
+    cvInitFont(&font, CV_FONT_HERSHEY_COMPLEX, 0.5, 0.5, 1, 2, 8);
+    cvPutText(train_img, temp, cvPoint(20, 20), &font, CV_RGB(0,0,255));
     for (i = 0; i < boxes; ++i) {
         float x = truth[i * n + 0] * sized.w;
         float y = truth[i * n + 1] * sized.h;
         float w = truth[i * n + 2] * sized.w;
         float h = truth[i * n + 3] * sized.h;
-        float id = truth[i * n + n-1;
+        float id = truth[i * n + n-1];
         if (x == 0 && y == 0) continue;
-        printf("%f %f %f %f %f\n", x, y, w, h, id);
         cvRectangle(train_img, cvPoint((int)(x-w/2), (int)(y-h/2)), cvPoint((int)(x+w/2), (int)(y+h/2)),  CV_RGB(0, 0, 0), 2, 8, 0);
+        for (k = 0; k < keypoints_num; ++k) {
+            float vis = truth[i * n + 4 + 3 * k];
+            float kpx = truth[i * n + 4 + 3 * k + 1] * sized.w;
+            float kpy = truth[i * n + 4 + 3 * k + 2] * sized.h;
+            if (fabs(vis) > 0) {
+                cvCircle(train_img, cvPoint((int)kpx, (int)kpy), 5, CV_RGB(255, 0, 0), -1, 8, 0);
+                char keypoint_id[10];
+                sprintf(keypoint_id, "%d", k);
+                cvPutText(train_img, keypoint_id, cvPoint((int)kpx, (int)kpy-5), &font, CV_RGB(0,0,255));
+            }
+        }
     }
     cvShowImage("train_img", train_img);
     cvWaitKey(0);
@@ -1814,7 +1861,7 @@ data single_keypoint_data_transform(char* path, int w, int h, int boxes, int key
     return d;
 }
 
-data load_data_keypoint(int n, char **paths, int m, int w, int h, int boxes, int keypoints_num, int classes, float jitter, float hue, float saturation, float exposure,
+data load_data_keypoint(int n, char **paths, int m, int w, int h, int boxes, int keypoints_num, keypoint_id_map *keypoints_flip_map, int keypoint_id_map_count, int classes, float jitter, float hue, float saturation, float exposure,
     int openscale, float filter_thresh, int data_fusion_type, float data_fusion_prob, float mosaic_min_offset)
 {
     char **random_paths = get_random_paths(paths, n, m);
@@ -1826,14 +1873,14 @@ data load_data_keypoint(int n, char **paths, int m, int w, int h, int boxes, int
     d.X.vals = calloc(d.X.rows, sizeof(float*));
     d.X.cols = h*w*3;
 
-    d.y = make_matrix(n, (5 + keypoints_num * 3)*boxes);  // cx, cy, w, h, cls, vis1, keypoint1_x, keypoint1_y, ...
+    d.y = make_matrix(n, (4 + keypoints_num * 3 + 1)*boxes);  // cx, cy, w, h, vis1, keypoint1_x, keypoint1_y, ..., cls
 
     for(i = 0; i < n; ++i){
         switch (data_fusion_type) {
             case 0:
             {
                 // original
-                data single = single_keypoint_data_transform(random_paths[i], w, h, boxes, keypoints_num, classes, jitter, hue, saturation, exposure, openscale, filter_thresh, 0.25, 2);
+                data single = single_keypoint_data_transform(random_paths[i], w, h, boxes, keypoints_num, keypoints_flip_map, keypoint_id_map_count, classes, jitter, hue, saturation, exposure, openscale, filter_thresh, 0.25, 2);
                 d.X.vals[i] = single.X.vals[0];
                 memcpy(d.y.vals[i], single.y.vals[0], d.y.cols * sizeof(float));
                 free(single.y.vals[0]);
@@ -2041,7 +2088,7 @@ void *load_thread(void *ptr)
     } else if (a.type == DETECTION_DATA){
         *a.d = load_data_detection(a.n, a.paths, a.m, a.w, a.h, a.num_boxes, a.classes, a.jitter, a.hue, a.saturation, a.exposure, a.openscale, a.filter_thresh, a.data_fusion_type, a.data_fusion_prob, a.mosaic_min_offset);
     } else if (a.type == KEYPOINT_DATA){
-        *a.d = load_data_keypoint(a.n, a.paths, a.m, a.w, a.h, a.num_boxes, a.keypoints_num, a.classes, a.jitter, a.hue, a.saturation, a.exposure, a.openscale, a.filter_thresh, a.data_fusion_type, a.data_fusion_prob, a.mosaic_min_offset);
+        *a.d = load_data_keypoint(a.n, a.paths, a.m, a.w, a.h, a.num_boxes, a.keypoints_num, a.keypoints_flip_map, a.keypoint_id_map_count, a.classes, a.jitter, a.hue, a.saturation, a.exposure, a.openscale, a.filter_thresh, a.data_fusion_type, a.data_fusion_prob, a.mosaic_min_offset);
     } else if (a.type == SWAG_DATA){
         *a.d = load_data_swag(a.paths, a.n, a.classes, a.jitter);
     } else if (a.type == COMPARE_DATA){

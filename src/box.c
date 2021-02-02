@@ -18,10 +18,42 @@ int nms_comparator(const void *pa, const void *pb)
     return 0;
 }
 
+int nms_comparator_keypoints(const void *pa, const void *pb)
+{
+    detection_with_keypoints a = *(detection_with_keypoints *)pa;
+    detection_with_keypoints b = *(detection_with_keypoints *)pb;
+    float diff = 0;
+    if(b.sort_class >= 0){
+        diff = a.prob[b.sort_class] - b.prob[b.sort_class];
+    } else {
+        diff = a.objectness - b.objectness;
+    }
+    if(diff < 0) return 1;
+    else if(diff > 0) return -1;
+    return 0;
+}
+
 int nms_comparator_v3(const void *pa, const void *pb)
 {
     detection a = *(detection *)pa;
     detection b = *(detection *)pb;
+    float diff = 0;
+    if (b.sort_class >= 0) {
+        diff = a.prob[b.sort_class] - b.prob[b.sort_class]; // there is already: prob = objectness*prob
+    }
+    else {
+        diff = a.objectness - b.objectness;
+    }
+    if (diff < 0) return 1;
+    else if (diff > 0) return -1;
+    return 0;
+}
+
+// nms_comparator_v3 equal to nms_comparator
+int nms_comparator_keypoints_v3(const void *pa, const void *pb)
+{
+    detection_with_keypoints a = *(detection_with_keypoints *)pa;
+    detection_with_keypoints b = *(detection_with_keypoints *)pb;
     float diff = 0;
     if (b.sort_class >= 0) {
         diff = a.prob[b.sort_class] - b.prob[b.sort_class]; // there is already: prob = objectness*prob
@@ -123,7 +155,7 @@ void do_nms_sort_with_keypoints(detection_with_keypoints *dets, int total, int c
         for(i = 0; i < total; ++i){
             dets[i].sort_class = k;
         }
-        qsort(dets, total, sizeof(detection_with_keypoints), nms_comparator);
+        qsort(dets, total, sizeof(detection_with_keypoints), nms_comparator_keypoints);
         for(i = 0; i < total; ++i){
             if(dets[i].prob[k] == 0) continue;
             box_with_keypoints a = dets[i].bkps;
@@ -407,6 +439,25 @@ float box_with_keypoints_ciou(box_with_keypoints a, box_with_keypoints b)
     box c = box_with_keypoints2box(a);
     box d = box_with_keypoints2box(b);
     return box_ciou(c, d);
+}
+
+float box_with_keypoints_oks(box_with_keypoints pred, box_with_keypoints truth)
+{
+    int i, keypoints_num = truth.keypoints_num;
+    int existent_num = 0;
+    float oks = 0., sigma = .025, variance = 4 * sigma * sigma;
+    // sigma for the degree of labeling keypoint pointing, asume all be .25
+    // CHECK: pred.w, pred.h not same as truth.w and turth.h
+    for (i = 0; i < keypoints_num; ++i) {
+        if (fabsf(truth.kps[i].v) > 0) {
+            float dx = (pred.kps[i].x - truth.kps[i].x);
+            float dy = (pred.kps[i].y - truth.kps[i].y);
+            float e = (dx*dx+dy*dy) / variance / (truth.w * truth.h) / 2.;
+            oks += expf(-e);
+            existent_num +=1;
+        }
+    }
+    return oks / existent_num;
 }
 
 float box_iou_kind(box a, box b, IOU_LOSS iou_kind) {
@@ -828,7 +879,7 @@ void diounms_sort_with_keypoints(detection_with_keypoints *dets, int total, int 
         for (i = 0; i < total; ++i) {
             dets[i].sort_class = k;
         }
-        qsort(dets, total, sizeof(detection_with_keypoints), nms_comparator_v3);
+        qsort(dets, total, sizeof(detection_with_keypoints), nms_comparator_keypoints_v3);
         for (i = 0; i < total; ++i)
         {
             if (dets[i].prob[k] == 0) continue;

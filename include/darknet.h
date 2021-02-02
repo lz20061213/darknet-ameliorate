@@ -608,6 +608,8 @@ typedef struct network{
     float max_ratio;
     float min_ratio;
 
+    int log_step;
+
     // filter the out-boxes when correct_boxes
     float filter_thresh;
 
@@ -675,6 +677,8 @@ typedef struct network{
     int transfer_todct;
     int dct_onlyY;
 
+    int keypoints_num;
+
     float *delta;
     float *workspace;
     int train;
@@ -716,6 +720,11 @@ typedef struct keypoint {
     float v, x, y;
 } keypoint;
 
+typedef struct keypoint_id_map {
+    int lid;
+    int rid;
+} keypoint_id_map;
+
 typedef struct box_with_keypoints {
     float x, y, w, h;
     int keypoints_num;
@@ -732,7 +741,7 @@ typedef struct dxrep {
 } dxrep;
 
 typedef struct ious {
-    float iou, giou, diou, ciou;
+    float iou, giou, diou, ciou, oks;
     dxrep dx_iou;
     dxrep dx_giou;
 } ious;
@@ -823,6 +832,8 @@ typedef struct load_args{
     float data_fusion_prob;
     float mosaic_min_offset;
     int keypoints_num;
+    keypoint_id_map *keypoints_flip_map;
+    int keypoint_id_map_count;
     int is_todct;
     data *d;
     image *im;
@@ -1019,6 +1030,7 @@ float box_with_keypoints_iou(box_with_keypoints a, box_with_keypoints b);
 float box_with_keypoints_giou(box_with_keypoints a, box_with_keypoints b);
 float box_with_keypoints_diou(box_with_keypoints a, box_with_keypoints b);
 float box_with_keypoints_ciou(box_with_keypoints a, box_with_keypoints b);
+float box_with_keypoints_oks(box_with_keypoints pred, box_with_keypoints truth);
 float box_with_keypoints_lb_dis(box_with_keypoints a, box_with_keypoints b);
 boxabs to_tblr(box a);
 dxrep dx_box_iou(box a, box b, IOU_LOSS iou_loss);

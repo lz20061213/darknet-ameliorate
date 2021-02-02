@@ -370,43 +370,47 @@ void calc_network_cost(network *netp)
     }
 
     *net.cost = 0;
-    printf("loss for ");
+    if (get_current_batch(&net) % net.log_step == 0)
+        printf("loss for ");
     for (i = 0; i < cost_type_count; ++i) {
         if (counts[i] > 0) {
             float cost_i = sums[i] / counts[i];
             *net.cost += cost_i;
-            switch (i) {
-                case 0:
-                    printf("classification: %.2f ", cost_i);
-                    break;
-                case 1:
-                    printf("hint: %.2f ", cost_i);
-                    break;
-                case 2:
-                    printf("yolo: %.2f ", cost_i);
-                    break;
-                case 3:
-                    printf("distill_yolo: %.2f ", cost_i);
-                    break;
-                case 4:
-                    printf("keypoint_yolo: %.2f ", cost_i);
-                    break;
-                case 5:
-                    printf("mutual_yolo: %.2f ", cost_i);
-                    break;
-                case 6:
-                    printf("mimicutual_yolo: %.2f ", cost_i);
-                    break;
-                case 7:
-                    printf("double_yolo: %.2f ", cost_i);
-                    break;
-                case 8:
-                    printf("heatmap: %.2f ", cost_i);
-                    break;
+            if (get_current_batch(&net) % net.log_step == 0) {
+                switch (i) {
+                    case 0:
+                        printf("classification: %.2f ", cost_i);
+                        break;
+                    case 1:
+                        printf("hint: %.2f ", cost_i);
+                        break;
+                    case 2:
+                        printf("yolo: %.2f ", cost_i);
+                        break;
+                    case 3:
+                        printf("distill_yolo: %.2f ", cost_i);
+                        break;
+                    case 4:
+                        printf("keypoint_yolo: %.2f ", cost_i);
+                        break;
+                    case 5:
+                        printf("mutual_yolo: %.2f ", cost_i);
+                        break;
+                    case 6:
+                        printf("mimicutual_yolo: %.2f ", cost_i);
+                        break;
+                    case 7:
+                        printf("double_yolo: %.2f ", cost_i);
+                        break;
+                    case 8:
+                        printf("heatmap: %.2f ", cost_i);
+                        break;
+                }
             }
         }
     }
-    printf("\n");
+    if (get_current_batch(&net) % net.log_step == 0)
+        printf("\n");
     free(counts);
     free(sums);
 }

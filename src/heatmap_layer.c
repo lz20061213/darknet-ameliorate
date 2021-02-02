@@ -100,7 +100,7 @@ float gaussian_radius(float h, float w, float min_overlap)
     return fminf(fminf(r1, r2), r3);
 }
 
-void draw_umich_gaussian(float *heatmaps, const layer l, int b, int k, int x, int y, int radius, int s)
+void draw_umich_gaussian(float *heatmaps, const layer l, int b, int k, int x, int y, int radius, int s, int v)
 {
     //printf("%d %d %d %d %d %d\n", b, k, x, y, radius, s);
     float *heatmap = heatmaps + b * l.outputs + k * l.out_h * l.out_w;
@@ -129,8 +129,10 @@ void draw_umich_gaussian(float *heatmaps, const layer l, int b, int k, int x, in
             gx = -radius + mapi;
             gy = -radius + mapj;
             gvalue = expf(-(gx * gx + gy * gy) / (2 * diameter / 6. * diameter / 6.));
-            if (heatmap[j * l.out_w + i] < gvalue * s)
-                heatmap[j * l.out_w + i] = gvalue * s;
+            gvalue *= s;
+            if (v == -1) gvalue *= -1;
+            if (fabsf(heatmap[j * l.out_w + i]) < fabsf(gvalue))
+                heatmap[j * l.out_w + i] = gvalue;
         }
     }
 }
@@ -161,8 +163,7 @@ void get_heatmap_truths(float *heatmaps, int *heatmap_mask, const layer l, netwo
                 vis = keypoint[4 + k * 3 + 0];
                 kpx = keypoint[4 + k * 3 + 1];
                 kpy = keypoint[4 + k * 3 + 2];
-                //printf("vis, kpx, kpy: %.2f, %.2f, %.2f\n", vis, kpx, kpy);
-                if (vis > 0 && kpx > 0 && kpx < 1 && kpy > 0 && kpy < 1) {
+                if ( fabsf(vis) > 0 && kpx > 0 && kpx < 1 && kpy > 0 && kpy < 1) {
                     int_kpx = (int)(kpx * l.out_w);
                     int_kpy = (int)(kpy * l.out_h);
                     //printf("int_kpx, int_kpy: %d %d\n", int_kpx, int_kpy);
@@ -172,7 +173,7 @@ void get_heatmap_truths(float *heatmaps, int *heatmap_mask, const layer l, netwo
                     heatmaps[b * l.outputs + l.keypoints_num * l.out_h * l.out_w + int_kpy * l.out_w + int_kpx] = kpx * l.out_w - int_kpx;
                     heatmaps[b * l.outputs + (l.keypoints_num + 1) * l.out_h * l.out_w + int_kpy * l.out_w + int_kpx] = kpy * l.out_h - int_kpy;
                     // set heatmap
-                    draw_umich_gaussian(heatmaps, l, b, k, int_kpx, int_kpy, radius, 1);
+                    draw_umich_gaussian(heatmaps, l, b, k, int_kpx, int_kpy, radius, 1, vis);
                     //count++;
                 }
             }
@@ -183,12 +184,17 @@ void get_heatmap_truths(float *heatmaps, int *heatmap_mask, const layer l, netwo
 
 void forward_heatmap_layer(const layer l, network net)
 {
-    int i, j, b, c, index, heatmap_count = 0, heatmap_offset_count = 0;
+    int i, j, b, c, index;
+    int heatmap_visible_count = 0, heatmap_occlusion_count = 0, heatmap_count = 0;
+    int heatmap_offset_count = 0;
     memcpy(l.output, net.input, l.outputs*l.batch*sizeof(float));
 
 #ifndef GPU
     activate_array(l.output, l.batch*l.outputs, LOGISTIC);
+    //activate_array(l.output, l.batch*l.keypoitns_num*l.out_h*l.out_w, TANH);
+    //activate_array(l.output+l.batch*l.keypoitns_num*l.out_h*l.out_w, l.batch*2*l.out_h*l.out_w, LOGISTIC);
     clamp_cpu(l.batch*l.outputs, l.output, 1, 0.0001, 0.9999);
+    //fabsf_clamp_cpu(l.batch*l.outputs, l.output, 1, 0.0001, 0.9999);
 #endif
 
     memset(l.delta, 0, l.outputs * l.batch * sizeof(float));
@@ -218,8 +224,14 @@ void forward_heatmap_layer(const layer l, network net)
                     // heatmap: focal_loss in centernet, refer https://github.com/xingyizhou/CenterNet
                     index = b * l.outputs + c * l.out_h * l.out_w + j * l.out_w + i;
                     if (c < l.keypoints_num) {
-                        if (heatmap_truth[index] == 1) {
-                            heatmap_count += 1;
+                        if (fabsf(heatmap_truth[index]) == 1) {
+                            if (heatmap_truth[index] == 1) {
+                                heatmap_visible_count += 1;
+                            }
+                            else {
+                                heatmap_occlusion_count += 1;
+                            }
+                            // CHECK: l.output -> 1
                             float floss_part1, floss_part2;
                             floss_part1 = powf(1-l.output[index], l.alpha);
                             floss_part2 = logf(l.output[index]);
@@ -230,12 +242,10 @@ void forward_heatmap_layer(const layer l, network net)
                         else
                         {
                             float floss_part1, floss_part2, floss_part3;
-                            floss_part1 = powf((1-heatmap_truth[index]), l.beta);
+                            // CHECK: l.output -> 0
+                            floss_part1 = powf((1-fabsf(heatmap_truth[index])), l.beta);
                             floss_part2 = powf(l.output[index], l.alpha);
-                            floss_part3 = logf(1 - l.output[index]);
-                            //printf("before heatmap_loss: %f\n", heatmap_loss);
-                            //printf("output: %f\n", l.output[index]);
-                            //printf("keypoint y!=0 floss: %f, %f %f %f\n", floss_part1 * floss_part2 * floss_part3, floss_part1, floss_part2, floss_part3);
+                            floss_part3 = logf(1-l.output[index]);
                             heatmap_loss += (floss_part1 * floss_part2 * floss_part3);
                             //printf("after heatmap_loss: %f\n", heatmap_loss);
                             l.delta[index] = floss_part1 * (l.alpha * floss_part2 / l.output[index] * floss_part3 - floss_part2 / (1 - l.output[index]));
@@ -259,18 +269,14 @@ void forward_heatmap_layer(const layer l, network net)
         }
     }
 
-//    printf("heatmap_count, heatmap_offset_count, %d %d\n", heatmap_count, heatmap_offset_count);
-//    printf("heatmap_loss, heatmap_offset_loss: %.4f, %.4f\n", heatmap_loss, heatmap_offset_loss);
-//    assert(1==2);
-
     free(heatmap_mask);
     free(heatmap_truth);
 
+    heatmap_count = heatmap_visible_count + heatmap_occlusion_count;
     if (heatmap_count > 0) heatmap_loss /= (-heatmap_count);
     if (heatmap_offset_count > 0) heatmap_offset_loss = heatmap_offset_loss * 2 / (heatmap_offset_count + 0.0001);
 
     *(l.cost) = heatmap_loss + heatmap_offset_loss;
-
 
     // normalize delta
     for (b = 0; b < l.batch; ++b) {
@@ -292,13 +298,15 @@ void forward_heatmap_layer(const layer l, network net)
         }
     }
 
-    fprintf(stderr, "heatmap %d, heatmap_pos_count: %d,  heatmap_offset_count: %d, heatmap_loss = %f, heatmap_offset_loss = %f, total_loss = %f \n",
-        net.index,
-        heatmap_count,
-        heatmap_offset_count,
-        heatmap_loss,
-        heatmap_offset_loss,
-        *(l.cost));
+    if (get_current_batch(&net) % net.log_step == 0)
+        fprintf(stderr, "heatmap %d, heatmap_visible_count: %d,  heatmap_occlusion_count: %d, heatmap_offset_count: %d, heatmap_loss = %f, heatmap_offset_loss = %f, total_loss = %f \n",
+            net.index,
+            heatmap_visible_count,
+            heatmap_occlusion_count,
+            heatmap_offset_count,
+            heatmap_loss,
+            heatmap_offset_loss,
+            *(l.cost));
 }
 
 void backward_heatmap_layer(const layer l, network net)
@@ -329,8 +337,12 @@ void forward_heatmap_layer_gpu(const layer l, network net)
 
     // sigmoid activation
     activate_array_gpu(l.output_gpu, l.batch * l.outputs, LOGISTIC, 0);
+    // TANH for first keypoints_nums, then LOGISTIC
+    //activate_array_gpu(l.output_gpu, l.batch * l.keypoints_num * l.out_h * l.out_w, TANH, 0);
+    //activate_array_gpu(l.output_gpu + l.batch * l.keypoints_num * l.out_h * l.out_w, l.batch * 2 * l.out_h * l.out_w, LOGISTIC, 0);
     // clamp
     clamp_gpu(l.batch * l.outputs, l.output_gpu, 1, 0.0001, 0.9999);
+    //fabsf_clamp_gpu(l.batch * l.outputs, l.output_gpu, 1, 0.0001, 0.9999);  // CHECK: fabsf(x) ~ (0.0001, 0.9999)
 
     if(!net.train || l.onlyforward){
         cuda_pull_array(l.output_gpu, l.output, l.batch*l.outputs);
@@ -344,6 +356,6 @@ void forward_heatmap_layer_gpu(const layer l, network net)
 
 void backward_heatmap_layer_gpu(const layer l, network net)
 {
-    axpy_gpu(l.batch*l.inputs, 1, l.delta_gpu, 1, net.delta_gpu, 1);
+    axpy_gpu(l.batch*l.inputs, l.scale, l.delta_gpu, 1, net.delta_gpu, 1);
 }
 #endif

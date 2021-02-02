@@ -581,6 +581,17 @@ __global__ void clamp_kernel(int N, float *X, int INCX, float clamp_min, float c
     if(i < N) X[i*INCX] = fminf(clamp_max, fmaxf(clamp_min, X[i*INCX]));
 }
 
+__global__ void fabsf_clamp_kernel(int N, float *X, int INCX, float clamp_min, float clamp_max)
+{
+    int i = (blockIdx.x + blockIdx.y*gridDim.x) * blockDim.x + threadIdx.x;
+    if(i < N) {
+        if (X[i*INCX] >= 0)
+            X[i*INCX] = fminf(clamp_max, fmaxf(clamp_min, X[i*INCX]));
+        else
+            X[i*INCX] = fminf(-clamp_min, fmaxf(-clamp_max, X[i*INCX]));
+    }
+}
+
 __global__ void quantize_kernel(float *x, int n, float shift, float bound, int diff, float static_rate, int is_round)
 {
     int i = (blockIdx.x + blockIdx.y*gridDim.x) * blockDim.x + threadIdx.x;
@@ -887,6 +898,12 @@ extern "C" void constrain_gpu(int N, float ALPHA, float * X, int INCX)
 extern "C" void clamp_gpu(int N, float *X, int INCX, float clamp_min, float clamp_max)
 {
     clamp_kernel<<<cuda_gridsize(N), BLOCK>>>(N, X, INCX, clamp_min, clamp_max);
+    check_error(cudaPeekAtLastError());
+}
+
+extern "C" void fabsf_clamp_gpu(int N, float *X, int INCX, float clamp_min, float clamp_max)
+{
+    fabsf_clamp_kernel<<<cuda_gridsize(N), BLOCK>>>(N, X, INCX, clamp_min, clamp_max);
     check_error(cudaPeekAtLastError());
 }
 

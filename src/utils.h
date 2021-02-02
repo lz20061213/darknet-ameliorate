@@ -65,5 +65,7 @@ void get_max_min(float *data, int n, float* max_data, float* min_data);
 void get_mean_variance(float *data, int n, float *mean, float *variance);
 
 void short2float(short* src, float* dst, int n);
+
+int folder_mkdirs(char *folder_path);
 #endif
 
